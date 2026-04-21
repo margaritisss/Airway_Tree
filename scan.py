@@ -1,11 +1,11 @@
 import glob
 import os
 import ants
+from joblib import Parallel, delayed
 import nibabel as nib
 import numpy as np
 from skimage import measure
 import trimesh
-
 
 def register_pairwise_affine(input_folder, which='all', ref_tree=None, output_folder=None, sdt_folder=None):
     """
@@ -124,7 +124,7 @@ def register_groupwise_deformable(
     groupwise_iters=3,
     gradient_step=0.2,    
     blending_weight=0.75,  
-    verbose=False, # 
+    verbose=False, 
 ):
     """
     Groupwise + deformable (SyN) registration of .nii.gz files.
@@ -227,10 +227,10 @@ def register_groupwise_deformable(
             f"({groupwise_iters} iteration(s), SyN) ..."
         )
         template = ants.build_template( # 
-            image_list=images,
-            iterations=groupwise_iters,
-            gradient_step=gradient_step,
-            blending_weight=blending_weight,
+            image_list      = images,
+            iterations      = groupwise_iters,
+            gradient_step   = gradient_step,
+            blending_weight = blending_weight,
         )
         print("Groupwise template built successfully.")
 
@@ -251,7 +251,7 @@ def register_groupwise_deformable(
             type_of_transform='SyN',
             verbose=verbose,
         )
-        stem = fname[:-len('.nii.gz')]          # strip .nii.gz
+        stem     = fname[:-len('.nii.gz')]    # strip .nii.gz
         out_name = f"{stem}_R_G.nii.gz"
         out_path = os.path.join(output_folder, out_name)
         ants.image_write(reg['warpedmovout'], out_path)
@@ -465,88 +465,6 @@ def nifti_to_aligned_stl(file_path, output_filename=None, level=0.5, verbose=Tru
         'is_segmentation': is_segmentation,
     }
 
-# def batch_nifti_to_stl(input_folder, output_folder, how_many='all', level=0.5, verbose=True):
-#     """
-#     Convert NIfTI files (.nii.gz) in a folder to spatially aligned STL meshes.
-    
-#     Parameters
-#     ----------
-#     input_folder : str
-#         Path to the folder containing .nii.gz files.
-#     output_folder : str
-#         Path to the folder where the _aligned.stl files will be saved.
-#         Created if it does not exist.
-#     how_many : int or str, optional
-#         How many files to process. Either a positive integer, or the string
-#         'all' to process every .nii.gz file in the folder (default: 'all').
-#     level : float, optional
-#         Iso-surface level passed to Marching Cubes (default: 0.5).
-#     verbose : bool, optional
-#         If True, print progress information (default: True).
-    
-#     Returns
-#     -------
-#     list of dict
-#         A list of result dictionaries, one per successfully converted file.
-#     """
-#     # Validate inputs
-#     if not os.path.isdir(input_folder):
-#         raise NotADirectoryError(f"Input folder does not exist: {input_folder}")
-    
-#     os.makedirs(output_folder, exist_ok=True)
-    
-#     # Collect all .nii.gz files (sorted for reproducibility)
-#     all_files = sorted(glob.glob(os.path.join(input_folder, '*.nii.gz')))
-    
-#     if not all_files:
-#         print(f"No .nii.gz files found in: {input_folder}")
-#         return []
-    
-#     # Resolve how_many
-#     if isinstance(how_many, str):
-#         if how_many.lower() == 'all':
-#             files_to_process = all_files
-#         else:
-#             raise ValueError(
-#                 f"Invalid value for how_many: {how_many!r}. "
-#                 "Use a positive integer or the string 'all'."
-#             )
-#     elif isinstance(how_many, int):
-#         if how_many <= 0:
-#             raise ValueError("how_many must be a positive integer.")
-#         files_to_process = all_files[:how_many]
-#     else:
-#         raise TypeError("how_many must be an int or the string 'all'.")
-    
-#     if verbose:
-#         print(f"Found {len(all_files)} file(s) in '{input_folder}'.")
-#         print(f"Processing {len(files_to_process)} file(s) -> '{output_folder}'\n")
-    
-#     # Process each selected file
-#     results = []
-#     for i, file_path in enumerate(files_to_process, start=1):
-#         if verbose:
-#             print(f"[{i}/{len(files_to_process)}]")
-        
-#         base_name = os.path.basename(file_path).replace('.nii.gz', '_aligned.stl')
-#         output_path = os.path.join(output_folder, base_name)
-        
-#         try:
-#             result = nifti_to_aligned_stl(
-#                 file_path,
-#                 output_filename=output_path,
-#                 level=level,
-#                 verbose=verbose,
-#             )
-#             results.append(result)
-#         except Exception as e:
-#             print(f"  ERROR processing {file_path}: {e}\n")
-    
-#     if verbose:
-#         print(f"Done. {len(results)}/{len(files_to_process)} file(s) converted successfully.")
-    
-#     return results
-
 def batch_nifti_to_stl(input_folder, how_many='all', level=0.5, verbose=True):
     """
     Convert NIfTI files (.nii.gz) in a folder to spatially aligned STL meshes.
@@ -611,7 +529,7 @@ def batch_nifti_to_stl(input_folder, how_many='all', level=0.5, verbose=True):
             result = nifti_to_aligned_stl(
                 file_path,
                 output_filename=None,
-                level=level,
+                level  =level,
                 verbose=verbose,
             )
             results.append(result)
@@ -622,3 +540,97 @@ def batch_nifti_to_stl(input_folder, how_many='all', level=0.5, verbose=True):
         print(f"Done. {len(results)}/{len(files_to_process)} file(s) converted successfully.")
     
     return results
+
+def pairwise_affine_parallel(input_folder, which='all', ref_tree=None, output_folder=None, sdt_folder=None):
+    """
+    Linearly (affine) register .nii.gz files from a folder.
+
+    Parameters
+    ----------
+    input_folder : str
+        Path to folder containing .nii.gz files.
+        
+    which : int or 'all'
+        Number of files to register. Use 'all' to register every file.
+        
+    fixed_image : str, optional
+        Path to the fixed reference image. If None, the first file in the
+        folder is used as the fixed image.
+        
+    output_folder : str, optional
+        Where to save results. Defaults to <input_folder>/registered.
+
+    Returns
+    -------
+    list of str
+        Paths to the saved registered images.
+    """
+    
+    # Collect .nii.gz files (sorted for reproducibility)
+    files = sorted(f for f in os.listdir(input_folder) if f.endswith('.nii.gz'))
+    if not files:
+        raise ValueError(f"No .nii.gz files found in {input_folder}")
+
+    # Validate `which`
+    if which == 'all':
+        n = len(files)
+    elif isinstance(which, int) and 1 <= which <= len(files):
+        n = which
+    else:
+        raise ValueError(
+            f"`which` must be 'all' or an int in 1..{len(files)}, got {which!r}"
+        )
+
+    # Output folder
+    if output_folder is None:
+        output_folder = os.path.join(input_folder, 'registered')
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # Helper: SDT file path
+    def sdt_path(fname):
+        base = fname[:-len('.nii.gz')] # strip .nii.gz to get base name which is used for naming the SDT file
+        return os.path.join(sdt_folder, f"{base}_sdt.nii.gz")
+
+    # Fixed image: provided path, or first file in the folder
+    if ref_tree is None:
+        fixed_path = os.path.join(input_folder, files[0])
+        fixed_fname = files[0] # for logging purposes, we do that before stripping .nii.gz to avoid confusion with the SDT file names
+    else:
+        fixed_path  = ref_tree
+        fixed_fname = os.path.basename(ref_tree)
+    fixed = ants.image_read(fixed_path)
+    
+    # If using SDTs, also load the fixed SDT (used to drive the registration)
+    if sdt_folder is not None:
+        fixed_sdt_path = sdt_path(fixed_fname)
+        if not os.path.isfile(fixed_sdt_path):
+            raise FileNotFoundError(
+                f"Expected fixed SDT at {fixed_sdt_path} but it does not exist."
+            )
+        fixed_sdt = ants.image_read(fixed_sdt_path)
+
+    saved = []
+    n_workers = int(os.environ.get('SLURM_CPUS_PER_TASK', 1))
+    saved = Parallel(n_jobs=n_workers)(delayed(_register_one)(fname, input_folder, output_folder, fixed, fixed_sdt, sdt_folder, sdt_path)
+       for fname in files[:n])
+    
+    return saved
+
+def _register_one(fname, input_folder, output_folder, fixed, fixed_sdt, sdt_folder, sdt_path):
+    
+    moving_path = os.path.join(input_folder, fname) # we do that inside the function to avoid issues with parallelization and shared state
+    moving      = ants.image_read(moving_path)      # we do that inside the function to avoid issues with parallelization and shared state
+
+    if sdt_folder is None:
+        reg    = ants.registration(fixed=fixed, moving=moving, type_of_transform='Affine')
+        warped = reg['warpedmovout']
+    else:
+        moving_sdt = ants.image_read(sdt_path(fname))
+        reg        = ants.registration(fixed=fixed_sdt, moving=moving_sdt,type_of_transform='Affine', aff_metric='meansquares',)
+        warped = ants.apply_transforms(fixed=fixed, moving=moving, transformlist=reg['fwdtransforms'], interpolator ='nearestNeighbor',)
+
+    base     = fname[:-len('.nii.gz')] # 
+    out_path = os.path.join(output_folder, f"{base}_R.nii.gz")
+    ants.image_write(warped, out_path)
+    print(f"Registered: {fname} -> {os.path.basename(out_path)}")
+    return out_path
