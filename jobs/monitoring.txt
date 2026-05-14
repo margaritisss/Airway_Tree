@@ -1,0 +1,25 @@
+#    Follow log live (replace JOBID)
+tail -f register_affine_parallel_785014.out
+
+
+#    see rolling stats while it runs, in a second terminal, run this every time you want a summary:
+grep "DONE" register_affine_parallel_785014.out | \
+  awk '{for(i=1;i<=NF;i++) if($i ~ /elapsed=/) {gsub(/elapsed=|s/,"",$i); print $i}}' | \
+  awk '{sum+=$1; n++} END {if(n>0) printf "Completed: %d, avg: %.1fs (%.1f min), total time so far: %.1f min\n", n, sum/n, sum/n/60, sum/60}'
+
+
+# this will print the first 3 DONE lines
+grep "DONE" register_affine_parallel_785014.out | head -3
+
+
+# on jobs/
+bash monitoring.sh
+
+
+###############################  Groupwise parallel monitoring ################################################
+
+
+
+bash groupwise_deformabl_monitoring.sh
+# or with explicit args:
+bash groupwise_deformabl_monitoring.sh register_groupwise_parallel_785XXX.out /home/ids/gmargari-24/Data/Groupwise_registered

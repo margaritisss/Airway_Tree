@@ -1,0 +1,42 @@
+#!/bin/bash
+#SBATCH --job-name=train_vae128
+#SBATCH --output=%x_%j.out
+#SBATCH --error=%x_%j.err
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --time=08:00:00
+#SBATCH --partition=H100,A100,L40S
+
+# Unbuffered Python stdout/stderr so the .out file updates live.
+export PYTHONUNBUFFERED=1
+
+echo "Job $SLURM_JOB_ID started on $(hostname) at $(date)"
+echo "Allocated CPUs: $SLURM_CPUS_PER_TASK"
+echo "GPU(s): $CUDA_VISIBLE_DEVICES"
+nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+echo "---"
+
+module load python/3.11.13
+source /home/ids/gmargari-24/3env/bin/activate
+export LD_LIBRARY_PATH=/projects/share/apps/miniconda3/25.5.1/lib:$LD_LIBRARY_PATH
+
+cd /home/ids/gmargari-24/airway_project/Encoding
+export PYTHONPATH=/home/ids/gmargari-24/airway_project:$PYTHONPATH
+
+OUT_DIR=/home/ids/gmargari-24/Data/vae_runs/run_${SLURM_JOB_ID} # Output directory for this run. Tagging with the SLURM job id keeps
+mkdir -p "$OUT_DIR"                                             # multiple runs from clobbering each other.
+
+NUM_WORKERS=$(( SLURM_CPUS_PER_TASK - 1 )) # Match DataLoader workers to allocated CPUs (leave one for the main process).
+
+time python -u train_VAE.py \
+    --data-dirs /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/AIIB23_128 \
+                /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/ATM22_128  \
+    --out-dir   "$OUT_DIR" \
+    --batch-size 4 \
+    --max-epochs 150 \
+    --num-workers $NUM_WORKERS \
+    --num-latents 256 \
+    --seed 0
+
+echo "Job finished at $(date)"
