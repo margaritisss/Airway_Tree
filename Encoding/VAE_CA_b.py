@@ -3,10 +3,45 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 # ---------------------------------------------------------------------------
 # Building blocks
 # ---------------------------------------------------------------------------
+def cyclical_beta(
+    iteration: int,
+    total_iterations: int,
+    n_cycles: int = 4,
+    ratio: float = 0.5,
+    beta_max: float = 1.0,
+    shape: str = "linear",   # "linear" | "sigmoid" | "cosine"
+) -> float:
+    """
+    Cyclical β schedule from Fu et al. 2019 (Eqs. 6-7).
+
+    Each cycle of length T/n_cycles has two phases:
+      - Anneal:  β goes 0 -> beta_max over the first `ratio` of the cycle.
+      - Fix:     β = beta_max for the remaining (1 - ratio).
+
+    Set n_cycles=1 to recover monotonic annealing.
+    Set ratio=0 to recover a constant β=beta_max schedule.
+    """
+    period = max(total_iterations / n_cycles, 1.0)          # length of each cycle in iterations; guard against division by zero if total_iterations < n_cycles
+    tau    = ((iteration - 1) % math.ceil(period)) / period # normalized [0, 1] position within the current cycle
+    if tau >= ratio:
+        return beta_max
+    # Anneal: scale tau to [0, 1] over the annealing portion
+    s = tau / ratio
+    if shape == "linear":
+        f = s
+    elif shape == "sigmoid":
+        # Centered sigmoid mapped to roughly [0, 1] over s in [0, 1]
+        f = 1.0 / (1.0 + math.exp(-12.0 * (s - 0.5)))
+    elif shape == "cosine":
+        f = 0.5 * (1.0 - math.cos(math.pi * s))
+    else:
+        raise ValueError(f"Unknown shape: {shape}")
+    return beta_max * f
 
 def _conv_block(in_ch: int, out_ch: int, stride: int, padding: int, kernel_size: int = 3) -> nn.Sequential:
     """Conv3d -> BatchNorm3d -> ELU."""
@@ -159,40 +194,24 @@ class VAELossOutput:
     recon: torch.Tensor
     kl: torch.Tensor
 
-def weighted_bce_with_logits(logits: torch.Tensor,
-                             target_binary: torch.Tensor,
-                             gamma: float = 0.99,
-                             eps: float = 1e-7) -> torch.Tensor:
-    """
-    Modified weighted BCE from the paper.
-
-    The original code:
-        L = -(98 * t * log(o) + 2 * (1-t) * log(1-o)) / 100
-    where o = clip(sigmoid(logits), 1e-7, 1-1e-7), t in {0,1}.
-
-    `gamma` is the weight on the false-negative (positive) term. The paper text
-    says γ=0.97; the released code uses γ=0.98 (= 98/100). Default is 0.97 to
-    match the paper text; pass gamma=0.98 to match the code.
-    """
-    o   = torch.clamp(torch.sigmoid(logits), eps, 1.0 - eps)
-    t   = target_binary
+def weighted_bce_with_logits(logits, target_binary, gamma=0.97, eps=1e-7):
+    o = torch.clamp(torch.sigmoid(logits), eps, 1.0 - eps)
+    t = target_binary
     pos = gamma * t * torch.log(o)
     neg = (1.0 - gamma) * (1.0 - t) * torch.log(1.0 - o)
-    return -(pos + neg).mean()
+    # Sum over voxels, average over batch -> per-sample reconstruction NLL
+    return -(pos + neg).flatten(1).sum(dim=1).mean()
 
-def kl_divergence(mu: torch.Tensor, logsigma: torch.Tensor) -> torch.Tensor:
-    """
-    KL( N(mu, sigma^2) || N(0, I) ), with logsigma = log σ.
+def kl_divergence(mu, logsigma):
+    # Sum over latent dims, average over batch -> per-sample KL
+    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))
+            ).sum(dim=1).mean()
 
-    Original Theano:
-        -0.5 * mean(1 + 2*logsigma - mu^2 - exp(2*logsigma))
-    """
-    return -0.5 * torch.mean(1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))
-
-def vae_loss(logits: torch.Tensor,
-             target_binary: torch.Tensor,
+def vae_loss(logits: torch.Tensor, 
+             target_binary: torch.Tensor, 
              mu: torch.Tensor,
              logsigma: torch.Tensor,
+             beta: float = 1.0,
              gamma: float = 0.99,
              use_kl: bool = True) -> VAELossOutput:
     """
@@ -206,6 +225,7 @@ def vae_loss(logits: torch.Tensor,
     logits        : raw decoder output, (B, 1, 32, 32, 32)
     target_binary : binary {0,1} target voxels, same shape as logits
     mu, logsigma  : latent means and log-sigmas, (B, num_latents)
+    beta          : weight for the KL divergence term
     gamma         : positive-class weight in the BCE; 0.98 matches the released
                     code, 0.97 matches the paper text.
     use_kl        : whether to add the KL term. The released code makes this
@@ -214,7 +234,7 @@ def vae_loss(logits: torch.Tensor,
     """
     recon = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
     kl    = kl_divergence(mu, logsigma)
-    total = recon + kl if use_kl else recon
+    total = recon + beta *kl if use_kl else recon
     return VAELossOutput(total=total, recon=recon, kl=kl)
 
 

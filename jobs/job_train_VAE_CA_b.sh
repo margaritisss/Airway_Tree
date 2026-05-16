@@ -12,7 +12,7 @@
 # Unbuffered Python stdout/stderr so the .out file updates live.
 export PYTHONUNBUFFERED=1
 
-echo "Job $SLURM_JOB_ID started on $(hostname) at $(date)" # this 
+echo "Job $SLURM_JOB_ID started on $(hostname) at $(date)"
 echo "Allocated CPUs: $SLURM_CPUS_PER_TASK"
 echo "GPU(s): $CUDA_VISIBLE_DEVICES"
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
@@ -25,14 +25,14 @@ export LD_LIBRARY_PATH=/projects/share/apps/miniconda3/25.5.1/lib:$LD_LIBRARY_PA
 cd /home/ids/gmargari-24/airway_project/Encoding
 export PYTHONPATH=/home/ids/gmargari-24/airway_project:$PYTHONPATH
 
-OUT_DIR=/home/ids/gmargari-24/airway_project/Data/vae_training/run_${SLURM_JOB_ID}
-mkdir -p "$OUT_DIR"                                          # multiple runs from clobbering each other.
+OUT_DIR=/home/ids/gmargari-24/Data/vae_runs/run_${SLURM_JOB_ID}
+mkdir -p "$OUT_DIR"
 
-NUM_WORKERS=$(( SLURM_CPUS_PER_TASK - 1 )) # Match DataLoader workers to allocated CPUs (leave one for the main process).
+NUM_WORKERS=$(( SLURM_CPUS_PER_TASK - 1 ))
 
-time python -u train_VAE.py \
+time python -u train_VAE_CA_b.py \
     --data-dirs /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/AIIB23_128 \
-                /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/ATM22_128  \
+                /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/ATM22_128 \
     --out-dir   "$OUT_DIR" \
     --batch-size 16 \
     --max-epochs 150 \

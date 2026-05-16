@@ -44,12 +44,6 @@ Adjustments vs. the original (made on purpose for our 128^3 + ATM22 setup)
   cfg['introspect'], cfg['discriminative'], cfg['cc'] flags; we keep the
   pure-VAE path only.
 
-Usage
------
-    python train_VAE.py \
-        --data-dirs /path/to/folder1 /path/to/folder2 \
-        --out-dir   /path/to/run_outputs \
-        --batch-size 4 --max-epochs 150
 """
 
 from __future__ import annotations
@@ -66,7 +60,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
 # Model + loss live in VAE.py next to this file
-from VAE import VoxelVAE128, vae_loss
+from VAE_CA_b import VoxelVAE128, vae_loss, cyclical_beta
 
 # ---------------------------------------------------------------------------
 # Config (mirrors the structure of the original cfg dict)
@@ -74,7 +68,7 @@ from VAE import VoxelVAE128, vae_loss
 
 # Learning-rate schedule, keyed by epoch index. Matches the original
 # `lr_schedule = {0: 0.0001, 1: 0.005}`: warmup for one epoch, then jump.
-LR_SCHEDULE = {0: 1e-4, 1: 5e-3}
+LR_SCHEDULE = {0: 1e-5, 1: 5e-4}
 
 CFG_DEFAULTS = {
     "batch_size": 4,            # original: 64 at 32^3; we drop for 128^3
@@ -89,6 +83,10 @@ CFG_DEFAULTS = {
     "use_kl": True,             # paper text says KL is part of the loss
     "num_workers": 4,
     "seed": 0,
+    "beta_n_cycles": 4,         # M in Fu et al.
+    "beta_ratio":    0.5,       # R in Fu et al.
+    "beta_max":      1.0,       # peak β within each cycle
+    "beta_shape":    "linear",  # "linear" | "sigmoid" | "cosine"
 }
 
 # ---------------------------------------------------------------------------
@@ -257,19 +255,32 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     cfg: dict,
-) -> dict:
+    start_itr: int,           # global iteration count entering this epoch
+    total_iterations: int,    # T for the β schedule
+) -> tuple[dict, int]:
     model.train()
-    running = {"vloss": 0.0, "kl": 0.0, "acc": 0.0, "tp": 0.0, "tn": 0.0, "n": 0}
+    running = {"vloss": 0.0, "kl": 0.0, "acc": 0.0, "tp": 0.0, "tn": 0.0, "beta_mean": 0.0, "n": 0}
+
+    itr = start_itr
 
     for x_bin in loader:
+        itr += 1
+        beta = cyclical_beta(
+            iteration=itr,
+            total_iterations=total_iterations,
+            n_cycles=cfg["beta_n_cycles"],
+            ratio=cfg["beta_ratio"],
+            beta_max=cfg["beta_max"],
+            shape=cfg["beta_shape"],
+        )
+
         x_bin = x_bin.to(device, non_blocking=True)
-        # Rescale {0,1} -> {-1, 2} for the encoder (target stays binary).
-        x_in = 3.0 * x_bin - 1.0
+        x_in  = 3.0 * x_bin - 1.0
 
         logits, mu, logsigma = model(x_in)
         out = vae_loss(
             logits, x_bin, mu, logsigma,
-            gamma=cfg["gamma"], use_kl=cfg["use_kl"],
+            gamma=cfg["gamma"], beta=beta, use_kl=cfg["use_kl"],
         )
 
         optimizer.zero_grad(set_to_none=True)
@@ -278,15 +289,17 @@ def train_one_epoch(
 
         acc, tp, tn = reconstruction_accuracy(logits, x_bin)
         bs = x_bin.shape[0]
-        running["vloss"] += out.recon.item() * bs
-        running["kl"]    += out.kl.item()    * bs
-        running["acc"]   += acc * bs
-        running["tp"]    += tp  * bs
-        running["tn"]    += tn  * bs
-        running["n"]     += bs
+        running["vloss"]     += out.recon.item() * bs
+        running["kl"]        += out.kl.item()    * bs
+        running["acc"]       += acc * bs
+        running["tp"]        += tp  * bs
+        running["tn"]        += tn  * bs
+        running["beta_mean"] += beta * bs
+        running["n"]         += bs
 
     n = max(running["n"], 1)
-    return {k: v / n for k, v in running.items() if k != "n"}
+    metrics = {k: v / n for k, v in running.items() if k != "n"}
+    return metrics, itr
 
 # ---------------------------------------------------------------------------
 # Checkpointing & logging
@@ -377,7 +390,7 @@ def main():
     train_ds = NiftiMaskDataset(
         args.data_dirs,
         flip_prob=cfg["flip_prob"],
-        augment=True,
+        augment=cfg["augment"],
     )
     train_loader = DataLoader(
         train_ds,
@@ -399,12 +412,19 @@ def main():
     # The original wires up L2 via `lasagne.regularization.regularize_network_params`
     # added into the loss; we use weight_decay which is mathematically equivalent
     # for SGD: the gradient gets a +reg*param term either way.
-    optimizer = torch.optim.SGD(
-        model.parameters(),
-        lr=LR_SCHEDULE[0],
-        momentum=cfg["momentum"],
-        nesterov=True,
-        weight_decay=cfg["reg"],
+    
+    # optimizer = torch.optim.SGD(
+    #     model.parameters(),
+    #     lr=LR_SCHEDULE[0],
+    #     momentum=cfg["momentum"],
+    #     nesterov=True,
+    #     weight_decay=cfg["reg"],
+    # )
+
+    optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=LR_SCHEDULE[0],
+    weight_decay=cfg["reg"],
     )
 
     # ---- Resume ----
@@ -423,6 +443,7 @@ def main():
     current_lr = LR_SCHEDULE[0]
     set_lr(optimizer, current_lr)
     logging.info("Initial learning rate: %g", current_lr)
+    total_iterations = cfg["max_epochs"] * len(train_loader)
 
     for epoch in range(start_epoch, cfg["max_epochs"]):
         
@@ -433,13 +454,15 @@ def main():
             current_lr = new_lr
 
         t0 = time.time()
-        train_metrics = train_one_epoch(model, train_loader, optimizer, device, cfg)
+        train_metrics, itr = train_one_epoch(
+            model, train_loader, optimizer, device, cfg,
+            start_itr=itr, total_iterations=total_iterations,
+        )
         dt = time.time() - t0
-        itr += len(train_loader)
 
         logging.info(
-            "Epoch %d/%d  lr=%g  v_loss=%.4f  D_kl=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
-            epoch, cfg["max_epochs"] - 1, current_lr,
+            "Epoch %d/%d  lr=%g  β=%.3f  v_loss=%.4f  D_kl=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
+            epoch, cfg["max_epochs"] - 1, current_lr, train_metrics["beta_mean"],
             train_metrics["vloss"], train_metrics["kl"],
             train_metrics["acc"], train_metrics["tp"], train_metrics["tn"], dt,
         )
