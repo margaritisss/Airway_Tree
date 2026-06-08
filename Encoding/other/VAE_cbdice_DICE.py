@@ -4,12 +4,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from loss.cbdice_loss import SoftcbDiceLoss
 
 # ---------------------------------------------------------------------------
 # Building blocks
 # ---------------------------------------------------------------------------
-def cyclical_beta( iteration: int, total_iterations: int, n_cycles: int = 4, ratio: float = 0.5, beta_max: float = 1.0, shape: str = "linear",) -> float:   # "linear" | "sigmoid" | "cosine"
-
+def cyclical_beta(
+    iteration: int,
+    total_iterations: int,
+    n_cycles: int = 4,
+    ratio: float = 0.5,
+    beta_max: float = 1.0,
+    shape: str = "linear",   # "linear" | "sigmoid" | "cosine"
+) -> float:
     """
     Cyclical β schedule from Fu et al. 2019 (Eqs. 6-7).
 
@@ -40,21 +47,20 @@ def cyclical_beta( iteration: int, total_iterations: int, n_cycles: int = 4, rat
 def _conv_block(in_ch: int, out_ch: int, stride: int, padding: int, kernel_size: int = 3) -> nn.Sequential:
     """Conv3d -> BatchNorm3d -> ELU."""
     return nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=padding, bias=False),
-        nn.BatchNorm3d(out_ch),  
-        nn.ELU(inplace=True),
-    )
+           nn.BatchNorm3d(out_ch),  
+           nn.ELU(inplace=True),)
 
-def _deconv_block(in_ch: int, out_ch: int, kernel_size: int = 3, stride: int = 1, padding: int = 1, output_padding: int = 0,
-                  activation: bool = True) -> nn.Sequential:
+def _deconv_block(in_ch: int, out_ch: int, kernel_size: int = 3, stride: int = 1, padding: int = 1, output_padding: int = 0, activation: bool = True) -> nn.Sequential:
     
     """ConvTranspose3d -> BatchNorm3d -> (optional ELU)."""
     layers = [
         nn.ConvTranspose3d(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, bias=False),
-        nn.BatchNorm3d(out_ch),
-    ]
+        nn.BatchNorm3d(out_ch),]
+    
     if activation:
         layers.append(nn.ELU(inplace=True))
     return nn.Sequential(*layers) 
+
 
 # ---------------------------------------------------------------------------
 # Model
@@ -184,52 +190,119 @@ class VoxelVAE128(nn.Module):
 
 @dataclass # dataclass is a convenient way to bundle multiple outputs together 
 class VAELossOutput:
-                    total: torch.Tensor
-                    recon: torch.Tensor
-                    kl:    torch.Tensor
+    
+    total:  torch.Tensor
+    recon:  torch.Tensor
+    kl:     torch.Tensor
+    dice:   torch.Tensor
+    cbdice: torch.Tensor 
 
 def weighted_bce_with_logits(logits, target_binary, gamma=0.97, eps=1e-7):
-
-    o   = torch.clamp(torch.sigmoid(logits), eps, 1.0 - eps)
-    t   = target_binary
+    o = torch.clamp(torch.sigmoid(logits), eps, 1.0 - eps)
+    t = target_binary
     pos = gamma * t * torch.log(o)
     neg = (1.0 - gamma) * (1.0 - t) * torch.log(1.0 - o)
-    return -(pos + neg).flatten(1).sum(dim=1).mean()     # Sum over voxels, average over batch -> per-sample reconstruction NLL
+    # Sum over voxels, average over batch -> per-sample reconstruction NLL
+    return -(pos + neg).flatten(1).sum(dim=1).mean()
+
+def soft_dice_loss(logits, target_binary, smooth=1.0):
+    """
+    Foreground-only soft Dice loss for binary 3D segmentation.
+ 
+    Returns 1 - Dice in [0, 1]: 0 means perfect overlap, 1 means no overlap.
+    Dice is computed per-sample (averaging over the batch), summing over all
+    spatial dims so the score is volume-normalized within each sample. This
+    matches what clDice/cbDice are paired with in the original papers.
+ 
+    We deliberately omit the background term: with ~1-3% foreground voxels
+    in airway masks, a background-inclusive Dice is dominated by the trivial
+    near-1.0 background overlap and provides almost no gradient signal on the
+    structure of interest.
+    """
+    probs = torch.sigmoid(logits)                  # (B, 1, D, H, W)
+    p = probs.flatten(1)                           # (B, V)
+    t = target_binary.flatten(1)                   # (B, V)
+ 
+    intersection = (p * t).sum(dim=1)              # (B,)
+    p_sum = p.sum(dim=1)                           # (B,)
+    t_sum = t.sum(dim=1)                           # (B,)
+ 
+    dice = (2.0 * intersection + smooth) / (p_sum + t_sum + smooth)
+    return (1.0 - dice).mean()                     # scalar in [0, 1]
 
 def kl_divergence(mu, logsigma):
     # Sum over latent dims, average over batch -> per-sample KL
-    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))).sum(dim=1).mean()
+    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))
+            ).sum(dim=1).mean()
 
-def vae_loss(logits: torch.Tensor, 
-             target_binary: torch.Tensor, 
+def vae_loss(logits: torch.Tensor,
+             target_binary: torch.Tensor,
              mu: torch.Tensor,
              logsigma: torch.Tensor,
+             cbdice_module: SoftcbDiceLoss,
              beta: float = 1.0,
-             gamma: float = 0.99,
-             use_kl: bool = True) -> VAELossOutput:
+             alpha_dice: float = 0.5,
+             use_kl: bool = True,
+             dice_smooth: float = 1.0) -> VAELossOutput:
     """
-    Full VAE objective: weighted BCE reconstruction + (optional) KL.
-
+    VAE objective with a Dice + cbDice reconstruction term.
+ 
+    Reconstruction = alpha_dice * SoftDice + (1 - alpha_dice) * cbDice
+    Both terms live in [0, 1] (lower is better), so alpha_dice in [0, 1]
+    cleanly trades volume-overlap fidelity (Dice) against topological
+    fidelity (cbDice). alpha_dice = 1 -> pure Dice (good for warmup);
+    alpha_dice = 0 -> pure cbDice (rarely a good idea — unstable);
+    alpha_dice = 0.5 -> balanced (recommended default).
+ 
+    The previous BCE-based formulation is kept as `weighted_bce_with_logits`
+    for optional A/B testing but is no longer wired into this function.
+ 
     L2 weight decay is NOT included here — add it via the optimizer's
     `weight_decay` argument (the original used `cfg['reg'] = 0.001`).
-
+ 
     Parameters
     ----------
-    logits        : raw decoder output, (B, 1, 32, 32, 32)
+    logits        : raw decoder output, (B, 1, D, H, W)
     target_binary : binary {0,1} target voxels, same shape as logits
     mu, logsigma  : latent means and log-sigmas, (B, num_latents)
     beta          : weight for the KL divergence term
-    gamma         : positive-class weight in the BCE; 0.98 matches the released
-                    code, 0.97 matches the paper text.
-    use_kl        : whether to add the KL term. The released code makes this
-                    optional via `cfg['kl_div']` (default False), but the paper
-                    describes it as part of the loss, so default True here.
+    alpha_dice    : blend weight between Dice and cbDice in the reconstruction
+                    term. See above.
+    use_kl        : whether to add the KL term.
+    dice_smooth   : Laplace-style smoothing for soft Dice (avoids 0/0 when a
+                    sample has no foreground or the network predicts nothing).
     """
-    recon = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
+    # --- Reconstruction: Dice + cbDice (both in [0, 1], lower is better) ---
+    dice = soft_dice_loss(logits, target_binary, smooth=dice_smooth)
+ 
+    # cbDice module expects (B, 2, ...) softmax-style logits and integer labels.
+    # SoftcbDiceLoss in this codebase returns a value in [0, 1] where 0 is
+    # perfect centerline+caliber agreement. (The previous code was treating
+    # it as negative because the trainer was negating it for display — see
+    # the note in train_VAE_cbdice.py. We now return it as-is here.)
+    logits_2ch = to_two_channel_logits(logits)         # (B, 2, D, H, W)
+    y_true_int = (target_binary > 0.5).long()          # (B, 1, D, H, W)
+    # cb       = cbdice_module(logits_2ch, y_true_int) # scalar in [0, 1]
+    cb         = 1.0 + cbdice_module(logits_2ch, y_true_int)  # maps [-1, 0] -> [0, 1]
+    recon      = alpha_dice * dice + (1.0 - alpha_dice) * cb
+ 
+    # --- KL ---
     kl    = kl_divergence(mu, logsigma)
-    total = recon + beta *kl if use_kl else recon
-    return VAELossOutput(total=total, recon=recon, kl=kl)
+    total = recon + beta * kl if use_kl else recon
+ 
+    return VAELossOutput(total=total, recon=recon, kl=kl, dice=dice, cbdice=cb)
+ 
+def to_two_channel_logits(logits_1ch: torch.Tensor) -> torch.Tensor:
+    """
+    Convert single-channel sigmoid-style logits  (B, 1, D, H, W)
+    to two-channel softmax-style logits          (B, 2, D, H, W)
+    such that softmax(.)[:, 1] == sigmoid(logits_1ch).
 
+    For a single foreground class, setting background logit = 0
+    and foreground logit = z gives softmax = (1/(1+e^z), e^z/(1+e^z)) = (1-sigmoid(z), sigmoid(z)).
+    """
+    bg = torch.zeros_like(logits_1ch)          # (B, 1, D, H, W) i took this from the original code, but it seems to be just a tensor of zeros with the same shape as logits_1ch
+    return torch.cat([bg, logits_1ch], dim=1)  # (B, 2, D, H, W) now this tensor has two channels, the first one is all zeros (background) and the second one is the original logits (foreground)
 
 
 

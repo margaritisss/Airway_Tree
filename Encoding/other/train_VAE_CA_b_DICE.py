@@ -6,8 +6,7 @@ PyTorch training script for VoxelVAE128, faithful to:
     arXiv:1608.04236
 
 Original Theano/Lasagne training script:
-    https://github.com/ajbrock/Generative-and-Discriminative-Voxel-Modeling
-    (VAE_OL.py)
+    https://github.com/ajbrock/Generative-and-Discriminative-Voxel-Modeling (VAE_OL.py)
 
 Faithful reproductions of the original
 --------------------------------------
@@ -58,12 +57,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
-
-# Model + loss live in VAE.py next to this file
-from VAE_CA_b import VoxelVAE128, vae_loss, cyclical_beta
+from airway_project.Encoding.other.VAE_CA_b_DICE import VoxelVAE128, vae_loss, cyclical_beta
 
 # ---------------------------------------------------------------------------
-# Config (mirrors the structure of the original cfg dict)
+# Config 
 # ---------------------------------------------------------------------------
 
 # Learning-rate schedule, keyed by epoch index. Matches the original
@@ -71,20 +68,20 @@ from VAE_CA_b import VoxelVAE128, vae_loss, cyclical_beta
 LR_SCHEDULE = {0: 1e-5, 1: 5e-4}
 
 CFG_DEFAULTS = {
-                "batch_size": 4,            # original: 64 at 32^3; we drop for 128^3
-                "max_epochs": 150,          # original: cfg['max_epochs'] = 150
-                "reg": 2e-3,                # original: cfg['reg'] = 0.001 (L2 weight decay)
-                "flip_prob": 0.2,           # original jitter_chunk used binomial(1, 0.2)
-                "checkpoint_every_nth": 5,  # original: cfg['checkpoint_every_nth'] = 5
-                "num_latents": 100,         # our scale-up choice (paper used 100)
-                "gamma": 0.99,              # weighted-BCE positive weight (released code)
-                "use_kl": True,             # paper text says KL is part of the loss
-                "num_workers": 4,
-                "seed": 0,
-                "beta_n_cycles": 4,         # M in Fu et al.
-                "beta_ratio":    0.5,       # It dictates that for each cycle, β will gradually increase for the first 50% of the cycle, and then stay locked at its maximum value (beta_max) for the remaining 50% of the cycle.
-                "beta_max":      1.0,       # peak β within each cycle
-                "beta_shape":    "linear",  # "linear" | "sigmoid" | "cosine"
+    "batch_size": 4,            # original: 64 at 32^3; we drop for 128^3
+    "max_epochs": 150,          # original: cfg['max_epochs'] = 150
+    "reg": 2e-3,                # original: cfg['reg'] = 0.001 (L2 weight decay)
+    "flip_prob": 0.2,           # original jitter_chunk used binomial(1, 0.2)
+    "num_latents":         100, # our scale-up choice (paper used 100)
+    "gamma":               0.99,# weighted-BCE positive weight (released code)
+    "bce_weight":  0.5,         # weight for the BCE term in the combined loss
+    "use_kl": True,             # paper text says KL is part of the loss
+    "num_workers": 4,
+    "seed": 0,
+    "beta_n_cycles": 4,         # M in Fu et al.
+    "beta_ratio":    0.5,       # R in Fu et al.
+    "beta_max":      1.0,       # peak β within each cycle
+    "beta_shape":    "linear",  # "linear" | "sigmoid" | "cosine"
 }
 
 # ---------------------------------------------------------------------------
@@ -205,10 +202,11 @@ def set_lr(optimizer: torch.optim.Optimizer, lr: float) -> None:
 
 def lr_for_epoch(schedule: dict, epoch: int, current_lr: float) -> float:
     """If `epoch` is in the schedule dict, return that LR; else keep current.
-       Matches the original's per-epoch dict lookup."""
+    Matches the original's per-epoch dict lookup."""
     if epoch in schedule:
         return float(schedule[epoch])
     return current_lr
+
 
 # ---------------------------------------------------------------------------
 # Metrics (faithful to the original)
@@ -225,7 +223,6 @@ def reconstruction_accuracy(logits: torch.Tensor, target_binary: torch.Tensor) -
 
     Returns (accuracy, tp_rate, tn_rate).
     """
-
     with torch.no_grad():
         pred_pos = logits >= 0           # predicted-positive mask
         true_pos = target_binary >= 0.5  # true-positive mask
@@ -263,29 +260,30 @@ def train_one_epoch(
     for x_bin in loader:
         itr += 1
         beta = cyclical_beta(
-            iteration       = itr,
-            total_iterations= total_iterations,
-            n_cycles        = cfg["beta_n_cycles"],
-            ratio           = cfg["beta_ratio"],
-            beta_max        = cfg["beta_max"],
-            shape           = cfg["beta_shape"],
-        )
+                            iteration=itr,
+                            total_iterations=total_iterations,
+                            n_cycles=cfg["beta_n_cycles"],
+                            ratio=cfg["beta_ratio"],
+                            beta_max=cfg["beta_max"],
+                            shape=cfg["beta_shape"],)
 
-        x_bin = x_bin.to(device, non_blocking=True)
-        x_in  = 3.0 * x_bin - 1.0
-
+        x_bin                = x_bin.to(device, non_blocking=True)
+        x_in                 = 3.0 * x_bin - 1.0
         logits, mu, logsigma = model(x_in)
-        out = vae_loss(
-            logits, x_bin, mu, logsigma,
-            gamma=cfg["gamma"], beta=beta, use_kl=cfg["use_kl"],
-        )
+
+        out = vae_loss(logits, x_bin, mu, logsigma, 
+                       gamma     = cfg["gamma"], 
+                       beta      = beta, 
+                       use_kl    = cfg["use_kl"], 
+                       bce_weight= cfg["bce_weight"])
 
         optimizer.zero_grad(set_to_none=True)
         out.total.backward()
         optimizer.step()
 
         acc, tp, tn = reconstruction_accuracy(logits, x_bin)
-        bs = x_bin.shape[0]
+        bs          = x_bin.shape[0]
+
         running["vloss"]     += out.recon.item() * bs
         running["kl"]        += out.kl.item()    * bs
         running["acc"]       += acc * bs
@@ -302,19 +300,13 @@ def train_one_epoch(
 # Checkpointing & logging
 # ---------------------------------------------------------------------------
 
-def save_checkpoint(path: Path, model: nn.Module, optimizer: torch.optim.Optimizer,
-                    epoch: int, itr: int) -> None:
+def save_checkpoint(path: Path, model: nn.Module, optimizer: torch.optim.Optimizer, epoch: int, itr: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "epoch": epoch,
-            "itr": itr,
-            "ts": time.time(),
-            "model_state": model.state_dict(),
-            "optim_state": optimizer.state_dict(),
-        },
-        path,
-    )
+    torch.save({ "epoch": epoch,
+                 "itr": itr,
+                 "ts": time.time(),
+                 "model_state": model.state_dict(),
+                 "optim_state": optimizer.state_dict(),},path,)
 
 class JsonlLogger:
     """Append-only JSONL logger, equivalent in spirit to utils.metrics_logging."""
@@ -335,43 +327,34 @@ class JsonlLogger:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--data-dirs", type=Path, nargs="+", required=True,
-                        help="One or more directories containing .nii.gz mask files. "
-                             "All files in all listed directories are pooled into "
-                             "a single training set.")
-    parser.add_argument("--out-dir", type=Path, required=True,
-                        help="Where checkpoints + metrics.jsonl are written.")
+    parser.add_argument("--data-dirs", type=Path, nargs="+", required=True, help="One or more directories containing .nii.gz mask files. " "All files in all listed directories are pooled into " "a single training set.")
+    parser.add_argument("--out-dir", type=Path, required=True, help="Where checkpoints + metrics.jsonl are written.")
     parser.add_argument("--batch-size", type=int, default=CFG_DEFAULTS["batch_size"])
     parser.add_argument("--max-epochs", type=int, default=CFG_DEFAULTS["max_epochs"])
     parser.add_argument("--num-workers", type=int, default=CFG_DEFAULTS["num_workers"])
     parser.add_argument("--num-latents", type=int, default=CFG_DEFAULTS["num_latents"])
     parser.add_argument("--seed", type=int, default=CFG_DEFAULTS["seed"])
     parser.add_argument("--resume", type=Path, default=None, help="Path to a checkpoint to resume from.")
-    # Change this line in train_VAE.py
-    parser.add_argument("--data-augmentation", type=str, choices=['True', 'False','true', 'false'], default='false', 
-                    help="Enable or disable data augmentation (true or false).")
+    parser.add_argument("--data-augmentation", type=str, choices=['True', 'False','true', 'false'], default='false', help="Enable or disable data augmentation (true or false).")
     args = parser.parse_args()
 
     # Compose final cfg
     cfg = dict(CFG_DEFAULTS)
     cfg.update({
-        "batch_size":  args.batch_size,
-        "max_epochs":  args.max_epochs,
-        "num_workers": args.num_workers,
-        "num_latents": args.num_latents,
-        "seed":        args.seed,
-        "augment":     args.data_augmentation.lower() == 'true'
-    })
+                "batch_size":  args.batch_size,
+                "max_epochs":  args.max_epochs,
+                "num_workers": args.num_workers,
+                "num_latents": args.num_latents,
+                "seed":        args.seed,
+                "augment":     args.data_augmentation.lower() == 'true'})
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s| %(message)s",
-        handlers=[
-            logging.FileHandler(args.out_dir / "train.log"),
-            logging.StreamHandler(),
-        ],
-    )
+                        level   = logging.INFO,
+                        format  = "%(asctime)s %(levelname)s| %(message)s",
+                        handlers= [logging.FileHandler(args.out_dir / "train.log"),
+                                logging.StreamHandler(),],)
+    
     mlog = JsonlLogger(args.out_dir / "metrics.jsonl")
 
     logging.info("Config: %s", cfg)
@@ -385,46 +368,29 @@ def main():
 
     # ---- Data ----
     train_ds = NiftiMaskDataset(
-        args.data_dirs,
-        flip_prob=cfg["flip_prob"],
-        augment=cfg["augment"],
-    )
+                                args.data_dirs,
+                                flip_prob=cfg["flip_prob"],
+                                augment=cfg["augment"],)
+
     train_loader = DataLoader(
-        train_ds,
-        batch_size=cfg["batch_size"],
-        shuffle=True,                 # critical: mixes clean and jittered
-        num_workers=cfg["num_workers"],
-        pin_memory=(device.type == "cuda"),
-        drop_last=True,               # keeps BN happy with consistent batch sizes
-    )
-    logging.info("Train set: %d files (x2 with augmentation) -> %d samples per epoch",
-                 train_ds._n, len(train_ds))
+                            train_ds,
+                            batch_size=cfg["batch_size"],
+                            shuffle=True,                 # critical: mixes clean and jittered
+                            num_workers=cfg["num_workers"],
+                            pin_memory=(device.type == "cuda"),
+                            drop_last=True,)               # keeps BN happy with consistent batch sizes
+
+    logging.info("Train set: %d files (x2 with augmentation) -> %d samples per epoch", train_ds._n, len(train_ds))
 
     # ---- Model ----
+
     model    = VoxelVAE128(num_latents=cfg["num_latents"]).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     logging.info("Model: %s, %d params (%.2f M)", type(model).__name__, n_params, n_params / 1e6)
-
-    # ---- Optimizer: Nesterov SGD with L2 weight decay (faithful to original) ----
-    # The original wires up L2 via `lasagne.regularization.regularize_network_params`
-    # added into the loss; we use weight_decay which is mathematically equivalent
-    # for SGD: the gradient gets a +reg*param term either way.
-    
-    # optimizer = torch.optim.SGD(
-    #     model.parameters(),
-    #     lr=LR_SCHEDULE[0],
-    #     momentum=cfg["momentum"],
-    #     nesterov=True,
-    #     weight_decay=cfg["reg"],
-    # )
-
-    optimizer = torch.optim.Adam(
-    model.parameters(),
-    lr=LR_SCHEDULE[0],
-    weight_decay=cfg["reg"],
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR_SCHEDULE[0], weight_decay=cfg["reg"],)
 
     # ---- Resume ----
+
     start_epoch = 0
     itr         = 0
     if args.resume is not None:
@@ -437,6 +403,7 @@ def main():
                      args.resume, start_epoch, itr)
 
     # ---- Training loop ----
+
     current_lr = LR_SCHEDULE[0]
     set_lr(optimizer, current_lr)
     logging.info("Initial learning rate: %g", current_lr)
@@ -452,26 +419,17 @@ def main():
 
         t0 = time.time()
         train_metrics, itr = train_one_epoch(
-            model, train_loader, optimizer, device, cfg,
-            start_itr=itr, total_iterations=total_iterations,
-        )
+                                            model, train_loader, optimizer, device, cfg,
+                                            start_itr=itr, total_iterations=total_iterations,)
         dt = time.time() - t0
 
         logging.info(
-            "Epoch %d/%d  lr=%g  β=%.3f  v_loss=%.4f  D_kl=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
-            epoch, cfg["max_epochs"] - 1, current_lr, train_metrics["beta_mean"],
-            train_metrics["vloss"], train_metrics["kl"],
-            train_metrics["acc"], train_metrics["tp"], train_metrics["tn"], dt,
-        )
+                    "Epoch %d/%d  lr=%g  β=%.3f  v_loss=%.4f  D_kl=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
+                    epoch, cfg["max_epochs"] - 1, current_lr, train_metrics["beta_mean"],
+                    train_metrics["vloss"], train_metrics["kl"],
+                    train_metrics["acc"], train_metrics["tp"], train_metrics["tn"], dt,)
+        
         mlog.log(phase="train", epoch=epoch, itr=itr, lr=current_lr, dt=dt, **train_metrics)
-
-        # # Always-current rolling checkpoint (for resume / crash recovery)
-        # if epoch % cfg["checkpoint_every_nth"] == 0:
-        #     save_checkpoint(args.out_dir / "last.pt", model, optimizer, epoch, itr)
-
-        # # Permanent milestone snapshots
-        # if epoch in {50, 100, 125}:
-        #     save_checkpoint(args.out_dir / f"epoch_{epoch:04d}.pt", model, optimizer, epoch, itr)
 
     # Final checkpoint
     save_checkpoint(args.out_dir / "final.pt", model, optimizer, cfg["max_epochs"] - 1, itr)

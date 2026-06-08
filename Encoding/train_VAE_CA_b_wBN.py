@@ -60,7 +60,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
 # Model + loss live in VAE.py next to this file
-from VAE_CA_b import VoxelVAE128, vae_loss, cyclical_beta
+from VAE_CA_b_wBN import VoxelVAE128, vae_loss, cyclical_beta
 
 # ---------------------------------------------------------------------------
 # Config (mirrors the structure of the original cfg dict)

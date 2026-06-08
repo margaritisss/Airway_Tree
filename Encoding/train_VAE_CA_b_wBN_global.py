@@ -60,7 +60,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
 # Model + loss live in VAE.py next to this file
-from VAE_CA_b import VoxelVAE128, vae_loss, cyclical_beta
+from VAE_CA_b_wBN_global import VoxelVAE128, vae_loss, cyclical_beta
 
 # ---------------------------------------------------------------------------
 # Config (mirrors the structure of the original cfg dict)
@@ -256,65 +256,72 @@ def train_one_epoch(
     total_iterations: int,    # T for the β schedule
 ) -> tuple[dict, int]:
     model.train()
-    running = {"vloss": 0.0, "kl": 0.0, "acc": 0.0, "tp": 0.0, "tn": 0.0, "beta_mean": 0.0, "n": 0}
+
+    running = {"vloss": 0.0, "kl": 0.0, "beta_mean": 0.0, "n": 0}
+    pooled  = {"tp_correct": 0, "pos_total": 0, "tn_correct": 0, "neg_total": 0}
 
     itr = start_itr
 
     for x_bin in loader:
         itr += 1
-        beta = cyclical_beta(
-            iteration       = itr,
-            total_iterations= total_iterations,
-            n_cycles        = cfg["beta_n_cycles"],
-            ratio           = cfg["beta_ratio"],
-            beta_max        = cfg["beta_max"],
-            shape           = cfg["beta_shape"],
-        )
+        beta = cyclical_beta(iteration       = itr,
+                             total_iterations= total_iterations,
+                             n_cycles        = cfg["beta_n_cycles"],
+                             ratio           = cfg["beta_ratio"],
+                             beta_max        = cfg["beta_max"],
+                             shape           = cfg["beta_shape"],)
 
         x_bin = x_bin.to(device, non_blocking=True)
         x_in  = 3.0 * x_bin - 1.0
 
         logits, mu, logsigma = model(x_in)
-        out = vae_loss(
-            logits, x_bin, mu, logsigma,
-            gamma=cfg["gamma"], beta=beta, use_kl=cfg["use_kl"],
-        )
+        out                  = vae_loss(logits, x_bin, mu, logsigma, gamma=cfg["gamma"], beta=beta, use_kl=cfg["use_kl"],)
 
         optimizer.zero_grad(set_to_none=True)
         out.total.backward()
         optimizer.step()
 
-        acc, tp, tn = reconstruction_accuracy(logits, x_bin)
-        bs = x_bin.shape[0]
+        # acc, _, _ = reconstruction_accuracy(logits, x_bin)
+        bs        = x_bin.shape[0]
+
+        # globally-pooled tp/tn: accumulate raw voxel counts, divide once at epoch end
+        with torch.no_grad():
+            pred_pos = logits >= 0  # predicted-positive mask as predicted by the model (logits >= 0 corresponds to predicted probability >= 0.5 after sigmoid)
+            true_pos = x_bin >= 0.5 # true-positive mask (ground-truth positive voxels in the binary target) >= 0.5 corresponds to target value of 1 in the binary mask
+            true_neg = ~true_pos    # ~ is ~ logical NOT, so true_neg is the mask of true-negative voxels (where the target binary mask is 0)
+            correct  = (pred_pos == true_pos)
+            pooled["tp_correct"] += (correct & true_pos).sum().item()
+            pooled["pos_total"]  += true_pos.sum().item()
+            pooled["tn_correct"] += (correct & true_neg).sum().item()
+            pooled["neg_total"]  += true_neg.sum().item()
+
         running["vloss"]     += out.recon.item() * bs
         running["kl"]        += out.kl.item()    * bs
-        running["acc"]       += acc * bs
-        running["tp"]        += tp  * bs
-        running["tn"]        += tn  * bs
+        # running["acc"]       += acc * bs
         running["beta_mean"] += beta * bs
         running["n"]         += bs
 
     n = max(running["n"], 1)
     metrics = {k: v / n for k, v in running.items() if k != "n"}
+    metrics["tp"] = pooled["tp_correct"] / pooled["pos_total"] if pooled["pos_total"] > 0 else 0.0
+    metrics["tn"] = pooled["tn_correct"] / pooled["neg_total"] if pooled["neg_total"] > 0 else 0.0
+    metrics["acc"] = (pooled["tp_correct"] + pooled["tn_correct"]) / (pooled["pos_total"] + pooled["neg_total"]) if (pooled["pos_total"] + pooled["neg_total"]) > 0 else 0.0
     return metrics, itr
 
 # ---------------------------------------------------------------------------
 # Checkpointing & logging
 # ---------------------------------------------------------------------------
 
-def save_checkpoint(path: Path, model: nn.Module, optimizer: torch.optim.Optimizer,
-                    epoch: int, itr: int) -> None:
+def save_checkpoint(path: Path, model: nn.Module, optimizer: torch.optim.Optimizer, epoch: int, itr: int) -> None:
+
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
-        {
-            "epoch": epoch,
+        {   "epoch": epoch,
             "itr": itr,
             "ts": time.time(),
             "model_state": model.state_dict(),
-            "optim_state": optimizer.state_dict(),
-        },
-        path,
-    )
+            "optim_state": optimizer.state_dict(),},
+        path,)
 
 class JsonlLogger:
     """Append-only JSONL logger, equivalent in spirit to utils.metrics_logging."""
@@ -335,43 +342,29 @@ class JsonlLogger:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--data-dirs", type=Path, nargs="+", required=True,
-                        help="One or more directories containing .nii.gz mask files. "
-                             "All files in all listed directories are pooled into "
-                             "a single training set.")
-    parser.add_argument("--out-dir", type=Path, required=True,
-                        help="Where checkpoints + metrics.jsonl are written.")
+    parser.add_argument("--data-dirs", type=Path, nargs="+", required=True,help="One or more directories containing .nii.gz mask files. " "All files in all listed directories are pooled into ""a single training set.")
+    parser.add_argument("--out-dir", type=Path, required=True, help="Where checkpoints + metrics.jsonl are written.")
     parser.add_argument("--batch-size", type=int, default=CFG_DEFAULTS["batch_size"])
     parser.add_argument("--max-epochs", type=int, default=CFG_DEFAULTS["max_epochs"])
     parser.add_argument("--num-workers", type=int, default=CFG_DEFAULTS["num_workers"])
     parser.add_argument("--num-latents", type=int, default=CFG_DEFAULTS["num_latents"])
     parser.add_argument("--seed", type=int, default=CFG_DEFAULTS["seed"])
     parser.add_argument("--resume", type=Path, default=None, help="Path to a checkpoint to resume from.")
-    # Change this line in train_VAE.py
-    parser.add_argument("--data-augmentation", type=str, choices=['True', 'False','true', 'false'], default='false', 
-                    help="Enable or disable data augmentation (true or false).")
+    parser.add_argument("--data-augmentation", type=str, choices=['True', 'False','true', 'false'], default='false', help="Enable or disable data augmentation (true or false).")
     args = parser.parse_args()
 
     # Compose final cfg
     cfg = dict(CFG_DEFAULTS)
-    cfg.update({
-        "batch_size":  args.batch_size,
-        "max_epochs":  args.max_epochs,
-        "num_workers": args.num_workers,
-        "num_latents": args.num_latents,
-        "seed":        args.seed,
-        "augment":     args.data_augmentation.lower() == 'true'
-    })
+    cfg.update({"batch_size":  args.batch_size,
+                "max_epochs":  args.max_epochs,
+                "num_workers": args.num_workers,
+                "num_latents": args.num_latents,
+                "seed":        args.seed,
+                "augment":     args.data_augmentation.lower() == 'true'})
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s| %(message)s",
-        handlers=[
-            logging.FileHandler(args.out_dir / "train.log"),
-            logging.StreamHandler(),
-        ],
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s| %(message)s", handlers=[logging.FileHandler(args.out_dir / "train.log"),logging.StreamHandler(),],)
+    
     mlog = JsonlLogger(args.out_dir / "metrics.jsonl")
 
     logging.info("Config: %s", cfg)
@@ -384,45 +377,26 @@ def main():
     logging.info("Device: %s", device)
 
     # ---- Data ----
-    train_ds = NiftiMaskDataset(
-        args.data_dirs,
-        flip_prob=cfg["flip_prob"],
-        augment=cfg["augment"],
-    )
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=cfg["batch_size"],
-        shuffle=True,                 # critical: mixes clean and jittered
-        num_workers=cfg["num_workers"],
-        pin_memory=(device.type == "cuda"),
-        drop_last=True,               # keeps BN happy with consistent batch sizes
-    )
-    logging.info("Train set: %d files (x2 with augmentation) -> %d samples per epoch",
-                 train_ds._n, len(train_ds))
+    train_ds = NiftiMaskDataset( args.data_dirs,
+                                flip_prob=cfg["flip_prob"],
+                                augment=cfg["augment"],)
+    
+    train_loader = DataLoader( train_ds,
+                                batch_size=cfg["batch_size"],
+                                shuffle=True,                 # critical: mixes clean and jittered
+                                num_workers=cfg["num_workers"],
+                                pin_memory=(device.type == "cuda"),
+                                drop_last=True,)               # keeps BN happy with consistent batch sizes
+    
+    logging.info("Train set: %d files (x2 with augmentation) -> %d samples per epoch", train_ds._n, len(train_ds))
 
     # ---- Model ----
     model    = VoxelVAE128(num_latents=cfg["num_latents"]).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     logging.info("Model: %s, %d params (%.2f M)", type(model).__name__, n_params, n_params / 1e6)
-
-    # ---- Optimizer: Nesterov SGD with L2 weight decay (faithful to original) ----
-    # The original wires up L2 via `lasagne.regularization.regularize_network_params`
-    # added into the loss; we use weight_decay which is mathematically equivalent
-    # for SGD: the gradient gets a +reg*param term either way.
-    
-    # optimizer = torch.optim.SGD(
-    #     model.parameters(),
-    #     lr=LR_SCHEDULE[0],
-    #     momentum=cfg["momentum"],
-    #     nesterov=True,
-    #     weight_decay=cfg["reg"],
-    # )
-
-    optimizer = torch.optim.Adam(
-    model.parameters(),
-    lr=LR_SCHEDULE[0],
-    weight_decay=cfg["reg"],
-    )
+    optimizer = torch.optim.Adam( model.parameters(),
+                                  lr=LR_SCHEDULE[0],
+                                  weight_decay=cfg["reg"],)
 
     # ---- Resume ----
     start_epoch = 0
@@ -445,33 +419,22 @@ def main():
     for epoch in range(start_epoch, cfg["max_epochs"]):
         
         new_lr = lr_for_epoch(LR_SCHEDULE, epoch, current_lr) # LR schedule check (matches the original's per-epoch dict lookup)
+
         if new_lr != current_lr:
             logging.info("Changing learning rate from %g to %g", current_lr, new_lr)
             set_lr(optimizer, new_lr)
             current_lr = new_lr
 
         t0 = time.time()
-        train_metrics, itr = train_one_epoch(
-            model, train_loader, optimizer, device, cfg,
-            start_itr=itr, total_iterations=total_iterations,
-        )
+        train_metrics, itr = train_one_epoch( model, train_loader, optimizer, device, cfg, start_itr=itr, total_iterations=total_iterations,)
         dt = time.time() - t0
 
-        logging.info(
-            "Epoch %d/%d  lr=%g  β=%.3f  v_loss=%.4f  D_kl=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
-            epoch, cfg["max_epochs"] - 1, current_lr, train_metrics["beta_mean"],
-            train_metrics["vloss"], train_metrics["kl"],
-            train_metrics["acc"], train_metrics["tp"], train_metrics["tn"], dt,
-        )
+        logging.info( "Epoch %d/%d  lr=%g  β=%.3f  v_loss=%.4f  D_kl=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
+                     epoch, cfg["max_epochs"] - 1, current_lr, train_metrics["beta_mean"],
+                     train_metrics["vloss"], train_metrics["kl"],
+                     train_metrics["acc"], train_metrics["tp"], train_metrics["tn"], dt,)
+        
         mlog.log(phase="train", epoch=epoch, itr=itr, lr=current_lr, dt=dt, **train_metrics)
-
-        # # Always-current rolling checkpoint (for resume / crash recovery)
-        # if epoch % cfg["checkpoint_every_nth"] == 0:
-        #     save_checkpoint(args.out_dir / "last.pt", model, optimizer, epoch, itr)
-
-        # # Permanent milestone snapshots
-        # if epoch in {50, 100, 125}:
-        #     save_checkpoint(args.out_dir / f"epoch_{epoch:04d}.pt", model, optimizer, epoch, itr)
 
     # Final checkpoint
     save_checkpoint(args.out_dir / "final.pt", model, optimizer, cfg["max_epochs"] - 1, itr)

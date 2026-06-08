@@ -127,10 +127,10 @@ class VoxelVAE128(nn.Module):
         
         # Final layer: standard convolution to map down to output channel (1)
         self.dec9 = nn.Sequential(
-            nn.Conv3d(c1, n_channels, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm3d(n_channels)
-        )
-
+                                nn.Conv3d(c1, n_channels, kernel_size=3, stride=1, padding=1, bias=False),
+                                nn.BatchNorm3d(n_channels)) # No activation here since we'll apply BCEWithLogitsLoss which expects raw logits
+                                                            # this layer is the so called logits layer, it outputs the raw values that will be 
+                                                            # fed into the loss function, which applies sigmoid internally
         self._init_weights()
 
     def encode(self, x):
@@ -194,42 +194,65 @@ def weighted_bce_with_logits(logits, target_binary, gamma=0.97, eps=1e-7):
     t   = target_binary
     pos = gamma * t * torch.log(o)
     neg = (1.0 - gamma) * (1.0 - t) * torch.log(1.0 - o)
-    return -(pos + neg).flatten(1).sum(dim=1).mean()     # Sum over voxels, average over batch -> per-sample reconstruction NLL
+    return -(pos + neg).flatten(1).mean(dim=1).mean()     # Sum over voxels, average over batch -> per-sample reconstruction NLL
 
-def kl_divergence(mu, logsigma):
-    # Sum over latent dims, average over batch -> per-sample KL
-    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))).sum(dim=1).mean()
-
-def vae_loss(logits: torch.Tensor, 
-             target_binary: torch.Tensor, 
-             mu: torch.Tensor,
-             logsigma: torch.Tensor,
-             beta: float = 1.0,
-             gamma: float = 0.99,
-             use_kl: bool = True) -> VAELossOutput:
+def soft_dice_loss(logits, target_binary, eps=1e-6):
+     
+    """ Soft Dice loss on occupancy grids.
+        Operates on logits; applies sigmoid internally.
+        Returns per-sample Dice loss averaged over the batch.
     """
-    Full VAE objective: weighted BCE reconstruction + (optional) KL.
 
-    L2 weight decay is NOT included here — add it via the optimizer's
-    `weight_decay` argument (the original used `cfg['reg'] = 0.001`).
+    probs = torch.sigmoid(logits)       # 
+    p     = probs.flatten(1)            # (B, N_voxels)
+    g     = target_binary.flatten(1)    # (B, N_voxels)
 
-    Parameters
-    ----------
-    logits        : raw decoder output, (B, 1, 32, 32, 32)
-    target_binary : binary {0,1} target voxels, same shape as logits
-    mu, logsigma  : latent means and log-sigmas, (B, num_latents)
-    beta          : weight for the KL divergence term
-    gamma         : positive-class weight in the BCE; 0.98 matches the released
-                    code, 0.97 matches the paper text.
-    use_kl        : whether to add the KL term. The released code makes this
-                    optional via `cfg['kl_div']` (default False), but the paper
-                    describes it as part of the loss, so default True here.
+    intersection = (p * g).sum(dim=1) 
+    denom        = p.sum(dim=1) + g.sum(dim=1)
+
+    dice = (2.0 * intersection + eps) / (denom + eps)
+    return (1.0 - dice).mean()      # loss = 1 - Dice
+      
+def kl_divergence(mu, logsigma, free_bits: float = 0.0):
     """
-    recon = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
-    kl    = kl_divergence(mu, logsigma)
-    total = recon + beta *kl if use_kl else recon
-    return VAELossOutput(total=total, recon=recon, kl=kl)
+    Per-dimension Gaussian KL with an optional free-bits floor.
 
+    free_bits = λ ≥ 0 reserves λ nats of capacity per latent dimension that incur
+    NO penalty: each dim contributes max(λ, KL_dim) to the objective, so once a
+    dim's KL drops to λ its gradient vanishes and there is no longer any pressure
+    pushing it toward zero. This makes posterior collapse impossible by
+    construction, independent of beta. λ = 0.0 recovers the ordinary KL.
 
+    Returns (kl_loss, kl_raw):
+      kl_loss : clamped value for the objective — mean over dims of max(λ, KL_dim)
+      kl_raw  : the TRUE, unclamped KL (mean over dims) — log this to see real collapse
+    """
+    # per-element KL, shape (B, D); each element is >= 0
+    kl_elem    = -0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))
+    kl_per_dim = kl_elem.mean(dim=0)                            # average over batch -> (D,)
+    kl_raw     = kl_per_dim.mean()                             # true KL (for logging)
+    kl_loss    = torch.clamp(kl_per_dim, min=free_bits).mean()  # floored per dim (for objective)
+    return kl_loss, kl_raw
 
+def vae_loss(logits, target_binary, mu, logsigma,
+             beta:       float = 1.0,
+             gamma:      float = 0.99,
+             bce_weight: float = 0.5,
+             free_bits:  float = 0.0,
+             use_kl:     bool  = True) -> VAELossOutput:
+    """
+    Combined BCE+Dice reconstruction + (optional) free-bits KL.
+    L2 weight decay is applied via the optimizer's weight_decay, not here.
+    Targets are (B, 1, 128, 128, 128) occupancy grids.
 
+    free_bits : λ nats reserved per latent dim as a KL floor (0.0 = ordinary KL).
+    """
+    bce   = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
+    dice  = soft_dice_loss(logits, target_binary)
+    recon = bce_weight * bce + (1.0 - bce_weight) * dice
+
+    kl_loss, kl_raw = kl_divergence(mu, logsigma, free_bits=free_bits)
+    total = recon + beta * kl_loss if use_kl else recon
+
+    # report RAW kl so the logged D_kl still reveals true collapse
+    return VAELossOutput(total=total, recon=recon, kl=kl_raw)

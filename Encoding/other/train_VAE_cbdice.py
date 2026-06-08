@@ -56,11 +56,13 @@ from pathlib import Path
 import nibabel as nib
 import numpy as np
 import torch
+import torch._dynamo  # noqa: F401
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
 # Model + loss live in VAE.py next to this file
-from VAE_CA_b import VoxelVAE128, vae_loss, cyclical_beta
+from airway_project.Encoding.other.VAE_cbdice import VoxelVAE128, vae_loss, cyclical_beta
+from loss.cbdice_loss import SoftcbDiceLoss
 
 # ---------------------------------------------------------------------------
 # Config (mirrors the structure of the original cfg dict)
@@ -71,20 +73,25 @@ from VAE_CA_b import VoxelVAE128, vae_loss, cyclical_beta
 LR_SCHEDULE = {0: 1e-5, 1: 5e-4}
 
 CFG_DEFAULTS = {
-                "batch_size": 4,            # original: 64 at 32^3; we drop for 128^3
-                "max_epochs": 150,          # original: cfg['max_epochs'] = 150
-                "reg": 2e-3,                # original: cfg['reg'] = 0.001 (L2 weight decay)
-                "flip_prob": 0.2,           # original jitter_chunk used binomial(1, 0.2)
-                "checkpoint_every_nth": 5,  # original: cfg['checkpoint_every_nth'] = 5
-                "num_latents": 100,         # our scale-up choice (paper used 100)
-                "gamma": 0.99,              # weighted-BCE positive weight (released code)
-                "use_kl": True,             # paper text says KL is part of the loss
-                "num_workers": 4,
-                "seed": 0,
-                "beta_n_cycles": 4,         # M in Fu et al.
-                "beta_ratio":    0.5,       # It dictates that for each cycle, β will gradually increase for the first 50% of the cycle, and then stay locked at its maximum value (beta_max) for the remaining 50% of the cycle.
-                "beta_max":      1.0,       # peak β within each cycle
-                "beta_shape":    "linear",  # "linear" | "sigmoid" | "cosine"
+    "batch_size": 4,            # original: 64 at 32^3; we drop for 128^3
+    "max_epochs": 150,          # original: cfg['max_epochs'] = 150
+    "reg": 2e-3,                # original: cfg['reg'] = 0.001 (L2 weight decay)
+    "momentum": 0.9,            # original: cfg['momentum'] = 0.9, Nesterov
+    # "max_jitter": 16,         # scaled from 4 (32^3) to 16 (128^3)
+    "flip_prob": 0.2,           # original jitter_chunk used binomial(1, 0.2)
+    "checkpoint_every_nth": 5,  # original: cfg['checkpoint_every_nth'] = 5
+    "num_latents": 100,         # our scale-up choice (paper used 100)
+    "gamma": 0.97,              # weighted-BCE positive weight (released code)
+    "use_kl": True,             # paper text says KL is part of the loss
+    "num_workers": 4,
+    "seed": 0,
+    "beta_n_cycles": 4,          # M in Fu et al.
+    "beta_ratio":    0.5,        # R in Fu et al.
+    "beta_max":      1.0,        # peak β within each cycle
+    "beta_shape":    "linear",   # "linear" | "sigmoid" | "cosine"
+    "lambda_cb_max":     7000.0, # paper's β=1 for 3D binary; try 2.0 in a follow-up run
+    "lambda_cb_warmup":  20,     # epochs of pure BCE+KL before turning cbDice on
+    "lambda_cb_ramp":    10,     # epochs over which to linearly ramp 0 -> lambda_cb_max
 }
 
 # ---------------------------------------------------------------------------
@@ -205,17 +212,28 @@ def set_lr(optimizer: torch.optim.Optimizer, lr: float) -> None:
 
 def lr_for_epoch(schedule: dict, epoch: int, current_lr: float) -> float:
     """If `epoch` is in the schedule dict, return that LR; else keep current.
-       Matches the original's per-epoch dict lookup."""
+    Matches the original's per-epoch dict lookup."""
     if epoch in schedule:
         return float(schedule[epoch])
     return current_lr
+
+def lambda_cb_for_epoch(epoch: int, cfg: dict) -> float:
+    """0 during warmup, linear ramp afterward, plateau at lambda_cb_max."""
+    w = cfg["lambda_cb_warmup"]
+    r = cfg["lambda_cb_ramp"]
+    if epoch < w:
+        return 0.0
+    if epoch < w + r:
+        return cfg["lambda_cb_max"] * (epoch - w) / r
+    return cfg["lambda_cb_max"]
 
 # ---------------------------------------------------------------------------
 # Metrics (faithful to the original)
 # ---------------------------------------------------------------------------
 
-def reconstruction_accuracy(logits: torch.Tensor, target_binary: torch.Tensor) -> tuple[float, float, float]:
-
+def reconstruction_accuracy(
+    logits: torch.Tensor, target_binary: torch.Tensor
+) -> tuple[float, float, float]:
     """
     Faithfully reproduces the original's three reconstruction metrics:
 
@@ -225,7 +243,6 @@ def reconstruction_accuracy(logits: torch.Tensor, target_binary: torch.Tensor) -
 
     Returns (accuracy, tp_rate, tn_rate).
     """
-
     with torch.no_grad():
         pred_pos = logits >= 0           # predicted-positive mask
         true_pos = target_binary >= 0.5  # true-positive mask
@@ -252,32 +269,35 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     cfg: dict,
+    cbdice_fn: SoftcbDiceLoss,
     start_itr: int,           # global iteration count entering this epoch
     total_iterations: int,    # T for the β schedule
 ) -> tuple[dict, int]:
     model.train()
-    running = {"vloss": 0.0, "kl": 0.0, "acc": 0.0, "tp": 0.0, "tn": 0.0, "beta_mean": 0.0, "n": 0}
+    running = {"vloss": 0.0, "kl": 0.0, "cbdice": 0.0, "acc": 0.0, "tp": 0.0, "tn": 0.0, "beta_mean": 0.0, "lambda_cb_mean": 0.0, "n": 0}
 
     itr = start_itr
 
     for x_bin in loader:
         itr += 1
         beta = cyclical_beta(
-            iteration       = itr,
-            total_iterations= total_iterations,
-            n_cycles        = cfg["beta_n_cycles"],
-            ratio           = cfg["beta_ratio"],
-            beta_max        = cfg["beta_max"],
-            shape           = cfg["beta_shape"],
+            iteration=itr,
+            total_iterations=total_iterations,
+            n_cycles=cfg["beta_n_cycles"],
+            ratio=cfg["beta_ratio"],
+            beta_max=cfg["beta_max"],
+            shape=cfg["beta_shape"],
         )
 
         x_bin = x_bin.to(device, non_blocking=True)
         x_in  = 3.0 * x_bin - 1.0
 
         logits, mu, logsigma = model(x_in)
+        
         out = vae_loss(
             logits, x_bin, mu, logsigma,
-            gamma=cfg["gamma"], beta=beta, use_kl=cfg["use_kl"],
+            cbdice_module=cbdice_fn,  # <-- Add this line
+            gamma=cfg["gamma"], beta=beta, lambda_cb=cfg["lambda_cb_current"], use_kl=cfg["use_kl"],
         )
 
         optimizer.zero_grad(set_to_none=True)
@@ -286,13 +306,15 @@ def train_one_epoch(
 
         acc, tp, tn = reconstruction_accuracy(logits, x_bin)
         bs = x_bin.shape[0]
-        running["vloss"]     += out.recon.item() * bs
-        running["kl"]        += out.kl.item()    * bs
-        running["acc"]       += acc * bs
-        running["tp"]        += tp  * bs
-        running["tn"]        += tn  * bs
-        running["beta_mean"] += beta * bs
-        running["n"]         += bs
+        running["vloss"]          += out.recon.item() * bs
+        running["kl"]             += out.kl.item()    * bs
+        running["acc"]            += acc * bs
+        running["tp"]             += tp  * bs
+        running["tn"]             += tn  * bs
+        running["beta_mean"]      += beta * bs
+        running["n"]              += bs
+        running["cbdice"]         += out.cbdice.item() * bs   # negative number in [-1, 0]
+        running["lambda_cb_mean"] += cfg["lambda_cb_current"] * bs
 
     n = max(running["n"], 1)
     metrics = {k: v / n for k, v in running.items() if k != "n"}
@@ -401,8 +423,9 @@ def main():
                  train_ds._n, len(train_ds))
 
     # ---- Model ----
-    model    = VoxelVAE128(num_latents=cfg["num_latents"]).to(device)
-    n_params = sum(p.numel() for p in model.parameters())
+    model     = VoxelVAE128(num_latents=cfg["num_latents"]).to(device)
+    cbdice_fn = SoftcbDiceLoss(iter_=10, smooth=1.0).to(device)
+    n_params  = sum(p.numel() for p in model.parameters())
     logging.info("Model: %s, %d params (%.2f M)", type(model).__name__, n_params, n_params / 1e6)
 
     # ---- Optimizer: Nesterov SGD with L2 weight decay (faithful to original) ----
@@ -449,29 +472,33 @@ def main():
             logging.info("Changing learning rate from %g to %g", current_lr, new_lr)
             set_lr(optimizer, new_lr)
             current_lr = new_lr
+        
+        # ---- cbDice weight schedule (warmup + linear ramp) ----
+        cfg["lambda_cb_current"] = lambda_cb_for_epoch(epoch, cfg)
+        logging.info("epoch %d  lambda_cb=%.3f", epoch, cfg["lambda_cb_current"])
 
         t0 = time.time()
-        train_metrics, itr = train_one_epoch(
-            model, train_loader, optimizer, device, cfg,
-            start_itr=itr, total_iterations=total_iterations,
-        )
+        train_metrics, itr = train_one_epoch( model, train_loader, optimizer, device, cfg, cbdice_fn, start_itr=itr, total_iterations=total_iterations, )
         dt = time.time() - t0
 
         logging.info(
-            "Epoch %d/%d  lr=%g  β=%.3f  v_loss=%.4f  D_kl=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
-            epoch, cfg["max_epochs"] - 1, current_lr, train_metrics["beta_mean"],
+            "Epoch %d/%d  lr=%g  β=%.3f  λ_cb=%.3f  v_loss=%.4f  D_kl=%.4f  "
+            "cbDice=%.4f  acc=%.4f  tp=%.4f  tn=%.4f  (%.1fs)",
+            epoch, cfg["max_epochs"] - 1, current_lr,
+            train_metrics["beta_mean"], train_metrics["lambda_cb_mean"],
             train_metrics["vloss"], train_metrics["kl"],
+            -train_metrics["cbdice"],     # flip sign for the report
             train_metrics["acc"], train_metrics["tp"], train_metrics["tn"], dt,
         )
         mlog.log(phase="train", epoch=epoch, itr=itr, lr=current_lr, dt=dt, **train_metrics)
 
-        # # Always-current rolling checkpoint (for resume / crash recovery)
-        # if epoch % cfg["checkpoint_every_nth"] == 0:
-        #     save_checkpoint(args.out_dir / "last.pt", model, optimizer, epoch, itr)
+        # Always-current rolling checkpoint (for resume / crash recovery)
+        if epoch % cfg["checkpoint_every_nth"] == 0:
+            save_checkpoint(args.out_dir / "last.pt", model, optimizer, epoch, itr)
 
-        # # Permanent milestone snapshots
-        # if epoch in {50, 100, 125}:
-        #     save_checkpoint(args.out_dir / f"epoch_{epoch:04d}.pt", model, optimizer, epoch, itr)
+        # Permanent milestone snapshots
+        if epoch in {50, 100, 125}:
+            save_checkpoint(args.out_dir / f"epoch_{epoch:04d}.pt", model, optimizer, epoch, itr)
 
     # Final checkpoint
     save_checkpoint(args.out_dir / "final.pt", model, optimizer, cfg["max_epochs"] - 1, itr)

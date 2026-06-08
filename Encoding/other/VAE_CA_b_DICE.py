@@ -127,10 +127,10 @@ class VoxelVAE128(nn.Module):
         
         # Final layer: standard convolution to map down to output channel (1)
         self.dec9 = nn.Sequential(
-            nn.Conv3d(c1, n_channels, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm3d(n_channels)
-        )
-
+                                nn.Conv3d(c1, n_channels, kernel_size=3, stride=1, padding=1, bias=False),
+                                nn.BatchNorm3d(n_channels)) # No activation here since we'll apply BCEWithLogitsLoss which expects raw logits
+                                                            # this layer is the so called logits layer, it outputs the raw values that will be 
+                                                            # fed into the loss function, which applies sigmoid internally
         self._init_weights()
 
     def encode(self, x):
@@ -194,24 +194,41 @@ def weighted_bce_with_logits(logits, target_binary, gamma=0.97, eps=1e-7):
     t   = target_binary
     pos = gamma * t * torch.log(o)
     neg = (1.0 - gamma) * (1.0 - t) * torch.log(1.0 - o)
-    return -(pos + neg).flatten(1).sum(dim=1).mean()     # Sum over voxels, average over batch -> per-sample reconstruction NLL
+    return -(pos + neg).flatten(1).mean(dim=1).mean()     # Sum over voxels, average over batch -> per-sample reconstruction NLL
 
+def soft_dice_loss(logits, target_binary, eps=1e-6):
+     
+    """ Soft Dice loss on occupancy grids.
+        Operates on logits; applies sigmoid internally.
+        Returns per-sample Dice loss averaged over the batch.
+    """
+
+    probs = torch.sigmoid(logits)       # 
+    p     = probs.flatten(1)            # (B, N_voxels)
+    g     = target_binary.flatten(1)    # (B, N_voxels)
+
+    intersection = (p * g).sum(dim=1) 
+    denom        = p.sum(dim=1) + g.sum(dim=1)
+
+    dice = (2.0 * intersection + eps) / (denom + eps)
+    return (1.0 - dice).mean()      # loss = 1 - Dice
+      
 def kl_divergence(mu, logsigma):
     # Sum over latent dims, average over batch -> per-sample KL
-    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))).sum(dim=1).mean()
+    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))).mean(dim=1).mean()
 
-def vae_loss(logits: torch.Tensor, 
+def vae_loss(logits:        torch.Tensor, 
              target_binary: torch.Tensor, 
-             mu: torch.Tensor,
-             logsigma: torch.Tensor,
-             beta: float = 1.0,
-             gamma: float = 0.99,
+             mu:            torch.Tensor,
+             logsigma:      torch.Tensor,
+             beta:          float = 1.0,
+             gamma:         float = 0.99,
+             bce_weight:    float = 0.5,
              use_kl: bool = True) -> VAELossOutput:
     """
     Full VAE objective: weighted BCE reconstruction + (optional) KL.
 
-    L2 weight decay is NOT included here — add it via the optimizer's
-    `weight_decay` argument (the original used `cfg['reg'] = 0.001`).
+    L2 weight decay is NOT included here — add it via the optimizer's `weight_decay` argument (the original used `cfg['reg'] = 0.001`).
 
     Parameters
     ----------
@@ -219,17 +236,16 @@ def vae_loss(logits: torch.Tensor,
     target_binary : binary {0,1} target voxels, same shape as logits
     mu, logsigma  : latent means and log-sigmas, (B, num_latents)
     beta          : weight for the KL divergence term
-    gamma         : positive-class weight in the BCE; 0.98 matches the released
-                    code, 0.97 matches the paper text.
-    use_kl        : whether to add the KL term. The released code makes this
-                    optional via `cfg['kl_div']` (default False), but the paper
+    gamma         : positive-class weight in the BCE; 0.98 matches the released code, 0.97 matches the paper text.
+    bce_weight    : weight for the BCE term in the combined loss
+    use_kl        : whether to add the KL term. The released code makes this optional via `cfg['kl_div']` (default False), but the paper
                     describes it as part of the loss, so default True here.
     """
-    recon = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
+
+    bce   = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
+    dice  = soft_dice_loss(logits, target_binary)
+    recon = bce_weight * bce + (1.0 - bce_weight) * dice
     kl    = kl_divergence(mu, logsigma)
-    total = recon + beta *kl if use_kl else recon
+    total = recon + beta * kl if use_kl else recon
+
     return VAELossOutput(total=total, recon=recon, kl=kl)
-
-
-
-

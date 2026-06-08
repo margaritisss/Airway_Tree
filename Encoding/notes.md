@@ -25,3 +25,14 @@ Recon mean is over B × 1 × 128³ ≈ B × 2.1M elements
 KL mean is over B × 100 elements
 
 This means the relative weighting between recon and KL is the same as in their 32³ setup (because both use mean), but the implicit β coefficient is built into the mean reductions and matches what they did. So that's fine — but worth knowing if you ever want to rebalance with an explicit β.
+
+
+
+export LD_LIBRARY_PATH=/projects/share/apps/miniconda3/25.5.1/lib:$LD_LIBRARY_PATH
+
+python extract_embeddings.py \
+    --data-dirs /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/AIIB23_128 \
+                /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/ATM22_128 \
+    --checkpoint /home/ids/gmargari-24/airway_project/Data/vae_runs/300_affine_registered/final.pt \
+    --out embeddings.npz \
+    --num-latents 50

@@ -41,17 +41,13 @@ def _conv_block(in_ch: int, out_ch: int, stride: int, padding: int, kernel_size:
     """Conv3d -> BatchNorm3d -> ELU."""
     return nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=padding, bias=False),
         nn.BatchNorm3d(out_ch),  
-        nn.ELU(inplace=True),
-    )
+        nn.ELU(inplace=True),)
 
-def _deconv_block(in_ch: int, out_ch: int, kernel_size: int = 3, stride: int = 1, padding: int = 1, output_padding: int = 0,
-                  activation: bool = True) -> nn.Sequential:
-    
+def _deconv_block(in_ch: int, out_ch: int, kernel_size: int = 3, stride: int = 1, padding: int = 1, output_padding: int = 0, activation: bool = True) -> nn.Sequential:
     """ConvTranspose3d -> BatchNorm3d -> (optional ELU)."""
-    layers = [
-        nn.ConvTranspose3d(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, bias=False),
-        nn.BatchNorm3d(out_ch),
-    ]
+    layers = [ nn.ConvTranspose3d(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=padding, output_padding=output_padding, bias=False),
+               nn.BatchNorm3d(out_ch),]
+    
     if activation:
         layers.append(nn.ELU(inplace=True))
     return nn.Sequential(*layers) 
@@ -93,26 +89,19 @@ class VoxelVAE128(nn.Module):
 
         flat_dim = c8 * 7 * 7 * 7   # Bottleneck shape is now 1024 * 7 * 7 * 7 = 351,232
 
-        self.enc_fc = nn.Sequential(        # Fully connected layer to map from flattened conv output to latent space, dimensions: 351,232 -> 343
+        self.enc_fc = nn.Sequential(       # Fully connected layer to map from flattened conv output to latent space, dimensions: 351,232 -> 343
                       nn.Linear(flat_dim, fc_dim, bias=False),
                       nn.BatchNorm1d(fc_dim),
                       nn.ELU(inplace=True),
         )
-        self.enc_mu = nn.Sequential(        # Linear layer to map from fc_dim to num_latents for the mean of the latent distribution, dimensions: 343 -> 100
-                      nn.Linear(fc_dim, num_latents, bias=False),
-                      nn.BatchNorm1d(num_latents),
-        )
-        self.enc_logsigma = nn.Sequential(  # Linear layer to map from fc_dim to num_latents for the log-sigma of the latent distribution, dimensions: 343 -> 100
-                            nn.Linear(fc_dim, num_latents, bias=False),
-                            nn.BatchNorm1d(num_latents),
-        )
+        self.enc_mu       = nn.Linear(fc_dim, num_latents, bias=True)
+        self.enc_logsigma = nn.Linear(fc_dim, num_latents, bias=True)
 
         # ---- Decoder: 9 Layers (Mirror image) ----
-        self.dec_fc = nn.Sequential(
-                    nn.Linear(num_latents, fc_dim, bias=False), # 100 -> 343
-                    nn.BatchNorm1d(fc_dim),
-                    nn.ELU(inplace=True),
-        )
+        self.dec_fc = nn.Sequential( nn.Linear(num_latents, fc_dim, bias=False), # 100 -> 343
+                                     nn.BatchNorm1d(fc_dim),
+                                     nn.ELU(inplace=True),)
+        
         self._dec_unflatten_shape = (1, 7, 7, 7)
 
         # Note: We halve the channels at every step now as we work our way back up
@@ -144,7 +133,9 @@ class VoxelVAE128(nn.Module):
         h = self.enc8(h)
         h = h.flatten(1)
         h = self.enc_fc(h)
-        return self.enc_mu(h), self.enc_logsigma(h)
+        mu       = self.enc_mu(h)
+        logsigma = self.enc_logsigma(h).clamp(-10.0, 10.0)
+        return mu, logsigma
 
     def reparameterize(self, mu, logsigma):
         if self.training:

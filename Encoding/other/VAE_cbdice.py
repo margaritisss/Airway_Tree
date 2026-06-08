@@ -4,12 +4,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from loss.cbdice_loss import SoftcbDiceLoss
 
 # ---------------------------------------------------------------------------
 # Building blocks
 # ---------------------------------------------------------------------------
-def cyclical_beta( iteration: int, total_iterations: int, n_cycles: int = 4, ratio: float = 0.5, beta_max: float = 1.0, shape: str = "linear",) -> float:   # "linear" | "sigmoid" | "cosine"
-
+def cyclical_beta(
+    iteration: int,
+    total_iterations: int,
+    n_cycles: int = 4,
+    ratio: float = 0.5,
+    beta_max: float = 1.0,
+    shape: str = "linear",   # "linear" | "sigmoid" | "cosine"
+) -> float:
     """
     Cyclical β schedule from Fu et al. 2019 (Eqs. 6-7).
 
@@ -55,6 +62,7 @@ def _deconv_block(in_ch: int, out_ch: int, kernel_size: int = 3, stride: int = 1
     if activation:
         layers.append(nn.ELU(inplace=True))
     return nn.Sequential(*layers) 
+
 
 # ---------------------------------------------------------------------------
 # Model
@@ -184,28 +192,33 @@ class VoxelVAE128(nn.Module):
 
 @dataclass # dataclass is a convenient way to bundle multiple outputs together 
 class VAELossOutput:
-                    total: torch.Tensor
-                    recon: torch.Tensor
-                    kl:    torch.Tensor
+    
+    total: torch.Tensor
+    recon: torch.Tensor
+    kl: torch.Tensor
+    cbdice: torch.Tensor 
 
 def weighted_bce_with_logits(logits, target_binary, gamma=0.97, eps=1e-7):
-
-    o   = torch.clamp(torch.sigmoid(logits), eps, 1.0 - eps)
-    t   = target_binary
+    o = torch.clamp(torch.sigmoid(logits), eps, 1.0 - eps)
+    t = target_binary
     pos = gamma * t * torch.log(o)
     neg = (1.0 - gamma) * (1.0 - t) * torch.log(1.0 - o)
-    return -(pos + neg).flatten(1).sum(dim=1).mean()     # Sum over voxels, average over batch -> per-sample reconstruction NLL
+    # Sum over voxels, average over batch -> per-sample reconstruction NLL
+    return -(pos + neg).flatten(1).sum(dim=1).mean()
 
 def kl_divergence(mu, logsigma):
     # Sum over latent dims, average over batch -> per-sample KL
-    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))).sum(dim=1).mean()
+    return (-0.5 * (1.0 + 2.0 * logsigma - mu.pow(2) - torch.exp(2.0 * logsigma))
+            ).sum(dim=1).mean()
 
 def vae_loss(logits: torch.Tensor, 
              target_binary: torch.Tensor, 
              mu: torch.Tensor,
              logsigma: torch.Tensor,
+             cbdice_module: SoftcbDiceLoss,
              beta: float = 1.0,
              gamma: float = 0.99,
+             lambda_cb: float = 1.0,
              use_kl: bool = True) -> VAELossOutput:
     """
     Full VAE objective: weighted BCE reconstruction + (optional) KL.
@@ -225,11 +238,29 @@ def vae_loss(logits: torch.Tensor,
                     optional via `cfg['kl_div']` (default False), but the paper
                     describes it as part of the loss, so default True here.
     """
-    recon = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
-    kl    = kl_divergence(mu, logsigma)
-    total = recon + beta *kl if use_kl else recon
-    return VAELossOutput(total=total, recon=recon, kl=kl)
+    recon      = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
+    kl         = kl_divergence(mu, logsigma)
+    logits_2ch = to_two_channel_logits(logits)        # (B, 2, D, H, W)
+    y_true_int = (target_binary > 0.5).long()         # (B, 1, D, H, W)
+    cb         = cbdice_module(logits_2ch, y_true_int)        # scalar, in [-1, 0]
+    total = recon + lambda_cb * cb
 
+    if use_kl:
+        total = total + beta * kl
+
+    return VAELossOutput(total=total, recon=recon, kl=kl, cbdice=cb)
+
+def to_two_channel_logits(logits_1ch: torch.Tensor) -> torch.Tensor:
+    """
+    Convert single-channel sigmoid-style logits  (B, 1, D, H, W)
+    to two-channel softmax-style logits          (B, 2, D, H, W)
+    such that softmax(.)[:, 1] == sigmoid(logits_1ch).
+
+    For a single foreground class, setting background logit = 0
+    and foreground logit = z gives softmax = (1/(1+e^z), e^z/(1+e^z)) = (1-sigmoid(z), sigmoid(z)).
+    """
+    bg = torch.zeros_like(logits_1ch)          # (B, 1, D, H, W) i took this from the original code, but it seems to be just a tensor of zeros with the same shape as logits_1ch
+    return torch.cat([bg, logits_1ch], dim=1)  # (B, 2, D, H, W) now this tensor has two channels, the first one is all zeros (background) and the second one is the original logits (foreground)
 
 
 
