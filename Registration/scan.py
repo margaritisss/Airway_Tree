@@ -1182,3 +1182,128 @@ def crop_and_resample_airway_masks(input_folders, which='all',
     print("Output directories:")
     for in_folder, out_dir in output_dirs.items():
         print(f"  {in_folder}  ->  {out_dir}")
+
+
+def isotropic_center_pad(input_folders, 
+                                        target_spacing=(0.5, 0.5, 0.5), 
+                                        target_shape=(640, 640, 832)):
+    """
+    Scans input folder(s) for .nii.gz masks, resamples each to true physical 
+    isotropic resolution, center-pads (or crops) to a fixed grid size, and 
+    saves them in a sibling output folder ending in _<target_shape>.
+    """
+    # Normalize input_folders to a list
+    if isinstance(input_folders, (str, os.PathLike)):
+        input_folders = [input_folders]
+    input_folders = [os.path.abspath(p) for p in input_folders]
+
+    for in_folder in input_folders:
+        if not os.path.isdir(in_folder):
+            print(f"Warning: input folder does not exist, skipping: {in_folder}")
+            continue
+        
+        # Build the file list
+        search_pattern = os.path.join(in_folder, '*.nii.gz')
+        nii_files = sorted(glob.glob(search_pattern))
+        
+        if not nii_files:
+            print(f"No '.nii.gz' files found in {in_folder}")
+            continue
+            
+        # Create output directory: sibling of the input folder with _640 suffix
+        parent_dir = os.path.dirname(in_folder.rstrip(os.sep))
+        folder_name = os.path.basename(in_folder.rstrip(os.sep))
+        
+        # Automatically uses the first dimension of your target_shape (e.g., 640)
+        out_folder = os.path.join(parent_dir, f"{folder_name}_{target_shape[0]}")
+        os.makedirs(out_folder, exist_ok=True)
+        
+        print(f"\n=== Processing {len(nii_files)} files in: {in_folder} ===")
+        print(f"Outputting to: {out_folder}")
+        
+        successful = 0
+        
+        for index, file_path in enumerate(nii_files, start=1):
+            filename = os.path.basename(file_path)
+            out_path = os.path.join(out_folder, filename.replace('.nii.gz', '_resampled.nii.gz'))
+            
+            try:
+                # ---------------------------------------------------------
+                # 1. Load Data and Metadata
+                # ---------------------------------------------------------
+                img = nib.load(file_path)
+                data = img.get_fdata()
+                original_affine = img.affine
+                orig_spacing = img.header.get_zooms()[:3]
+                
+                # ---------------------------------------------------------
+                # 2. Resample to Isotropic Resolution
+                # ---------------------------------------------------------
+                zoom_factors = [orig_spacing[i] / target_spacing[i] for i in range(3)]
+                
+                resampled_data = zoom(data, zoom_factors, order=0, prefilter=False)
+                current_shape = resampled_data.shape
+                
+                # ---------------------------------------------------------
+                # 3. Center Pad (or Crop) to Target Shape
+                # ---------------------------------------------------------
+                final_data = np.zeros(target_shape, dtype=resampled_data.dtype)
+                shift_in_voxels = [0, 0, 0]
+                
+                start_idx_current = [0, 0, 0]
+                end_idx_current = list(current_shape)
+                start_idx_final = [0, 0, 0]
+                end_idx_final = list(target_shape)
+
+                for i in range(3):
+                    diff = target_shape[i] - current_shape[i]
+                    if diff > 0:
+                        # Pad
+                        pad_start = diff // 2
+                        start_idx_final[i] = pad_start
+                        end_idx_final[i] = pad_start + current_shape[i]
+                        shift_in_voxels[i] = -pad_start 
+                    elif diff < 0:
+                        # Crop
+                        crop_start = abs(diff) // 2
+                        start_idx_current[i] = crop_start
+                        end_idx_current[i] = crop_start + target_shape[i]
+                        shift_in_voxels[i] = crop_start 
+
+                s_final = tuple(slice(start_idx_final[i], end_idx_final[i]) for i in range(3))
+                s_current = tuple(slice(start_idx_current[i], end_idx_current[i]) for i in range(3))
+                
+                final_data[s_final] = resampled_data[s_current]
+                
+                # Re-binarize defensively
+                final_data = (final_data > 0).astype(np.uint8)
+
+                # ---------------------------------------------------------
+                # 4. Compute New Affine
+                # ---------------------------------------------------------
+                new_affine = np.copy(original_affine)
+                
+                for i in range(3):
+                    new_affine[:3, i] = new_affine[:3, i] / zoom_factors[i]
+                
+                shift_vector = np.array([shift_in_voxels[0], shift_in_voxels[1], shift_in_voxels[2], 1.0])
+                new_origin = new_affine.dot(shift_vector)
+                new_affine[:3, 3] = new_origin[:3]
+
+                # ---------------------------------------------------------
+                # 5. Save Output
+                # ---------------------------------------------------------
+                out_img = nib.Nifti1Image(final_data, new_affine)
+                out_img.set_qform(new_affine, code=1)
+                out_img.set_sform(new_affine, code=1)
+                
+                out_img.header.set_zooms(target_spacing)
+                
+                nib.save(out_img, out_path)
+                print(f"[{index}/{len(nii_files)}] {filename} resampled to {current_shape} -> padded to {target_shape}")
+                successful += 1
+                
+            except Exception as e:
+                print(f"[{index}/{len(nii_files)}] Error processing '{filename}': {e}")
+                
+        print(f"\nFinished! Successfully processed {successful} of {len(nii_files)} files in {folder_name}.")

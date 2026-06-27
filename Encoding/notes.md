@@ -31,8 +31,8 @@ This means the relative weighting between recon and KL is the same as in their 3
 export LD_LIBRARY_PATH=/projects/share/apps/miniconda3/25.5.1/lib:$LD_LIBRARY_PATH
 
 python extract_embeddings.py \
-    --data-dirs /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/AIIB23_128 \
-                /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Affine_registered/ATM22_128 \
-    --checkpoint /home/ids/gmargari-24/airway_project/Data/vae_runs/300_affine_registered/final.pt \
-    --out embeddings.npz \
-    --num-latents 50
+    --data-dirs /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Groupwise_non_linear_registered/AIIB23_128  \
+                /home/ids/gmargari-24/airway_project/Data/Registered_on_Template_22_23/Groupwise_non_linear_registered/ATM22_128 \
+    --checkpoint /home/ids/gmargari-24/airway_project/Data/vae_runs/run_846983/final.pt \
+    --out NL_300_32_16_embeddings.npz \
+    --num-latents 32

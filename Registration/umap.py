@@ -17,7 +17,7 @@ def apply_umap(embeddings_path: str, output_image: str = "umap_projection.png"):
     # Note: UMAP is highly sensitive to n_neighbors and min_dist. 
     print("Fitting UMAP manifold... (this might take a moment)")
     reducer = umap.UMAP(
-        n_neighbors = 5,    # Balances local vs global structure, n_neig
+        n_neighbors = 15,    # Balances local vs global structure, n_neig
         min_dist    = 0.0125,   # Controls cluster tightness
         n_components= 2,     # Target dimensions (2D for plotting)
         metric      = 'euclidean',  # Standard for VAE latent spaces
