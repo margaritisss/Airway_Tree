@@ -1,0 +1,132 @@
+_wandb:
+    value:
+        cli_version: 0.28.0
+        e:
+            90chzru8y3h2di8xyhz6vwavi74g2eth:
+                args:
+                    - --log
+                    - /home/ids/gmargari-24/airway_project/Data/vae_runs/new_256_L32/train.log
+                    - --metrics
+                    - /home/ids/gmargari-24/airway_project/Data/vae_runs/new_256_L32/metrics.jsonl
+                    - --project
+                    - airway-bvae
+                    - --name
+                    - new_256_L32_full
+                codePath: replot_three_charts.py
+                codePathLocal: replot_three_charts.py
+                email: georgios.margaritis@ip-paris.fr
+                executable: /home/ids/gmargari-24/airway_project/new_3env/bin/python
+                host: nodecpu01
+                os: Linux-6.12.0-211.7.3.el10_2.x86_64-x86_64-with-glibc2.39
+                program: /home/ids/gmargari-24/airway_project/Encoding/replot_three_charts.py
+                python: CPython 3.11.13
+                root: /home/ids/gmargari-24/airway_project/Encoding
+                startedAt: "2026-07-21T18:43:51.391251Z"
+                writerId: 90chzru8y3h2di8xyhz6vwavi74g2eth
+        m: []
+        python_version: 3.11.13
+        t:
+            "3":
+                - 2
+                - 13
+                - 16
+            "4": 3.11.13
+            "5": 0.28.0
+            "12": 0.28.0
+            "13": linux-x86_64
+        visualize:
+            cldice_combined:
+                panel_config:
+                    fieldSettings:
+                        lineKey: lineKey
+                        lineVal: lineVal
+                        step: step
+                    panelDefId: wandb/lineseries/v0
+                    stringSettings:
+                        title: clDice hard (train vs val)
+                        xname: epoch
+                    transform:
+                        name: tableWithLeafColNames
+                    userQuery:
+                        queryFields:
+                            - args:
+                                - name: runSets
+                                  value: ${runSets}
+                              fields:
+                                - fields: []
+                                  name: id
+                                - fields: []
+                                  name: name
+                                - fields: []
+                                  name: _defaultColorIndex
+                                - args:
+                                    - name: tableKey
+                                      value: cldice_combined_table
+                                  fields: []
+                                  name: summaryTable
+                              name: runSets
+                panel_type: Vega2
+            dice_combined:
+                panel_config:
+                    fieldSettings:
+                        lineKey: lineKey
+                        lineVal: lineVal
+                        step: step
+                    panelDefId: wandb/lineseries/v0
+                    stringSettings:
+                        title: Dice (train vs val)
+                        xname: epoch
+                    transform:
+                        name: tableWithLeafColNames
+                    userQuery:
+                        queryFields:
+                            - args:
+                                - name: runSets
+                                  value: ${runSets}
+                              fields:
+                                - fields: []
+                                  name: id
+                                - fields: []
+                                  name: name
+                                - fields: []
+                                  name: _defaultColorIndex
+                                - args:
+                                    - name: tableKey
+                                      value: dice_combined_table
+                                  fields: []
+                                  name: summaryTable
+                              name: runSets
+                panel_type: Vega2
+            loss_combined:
+                panel_config:
+                    fieldSettings:
+                        lineKey: lineKey
+                        lineVal: lineVal
+                        step: step
+                    panelDefId: wandb/lineseries/v0
+                    stringSettings:
+                        title: Loss (train vs val)
+                        xname: epoch
+                    transform:
+                        name: tableWithLeafColNames
+                    userQuery:
+                        queryFields:
+                            - args:
+                                - name: runSets
+                                  value: ${runSets}
+                              fields:
+                                - fields: []
+                                  name: id
+                                - fields: []
+                                  name: name
+                                - fields: []
+                                  name: _defaultColorIndex
+                                - args:
+                                    - name: tableKey
+                                      value: loss_combined_table
+                                  fields: []
+                                  name: summaryTable
+                              name: runSets
+                panel_type: Vega2
+note:
+    value: three continuous charts, both runs, from train.log

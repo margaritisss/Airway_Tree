@@ -1,0 +1,27 @@
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_setup.py:_flush():81] Current SDK version is 0.28.0
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_setup.py:_flush():81] Configure stats pid to 1535950
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_init.py:setup_run_log_directory():725] Logging user logs to /home/ids/gmargari-24/airway_project/Encoding/wandb/run-20260721_144426-i85uo8pk/logs/debug.log
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_init.py:setup_run_log_directory():726] Logging internal logs to /home/ids/gmargari-24/airway_project/Encoding/wandb/run-20260721_144426-i85uo8pk/logs/debug-internal.log
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_init.py:init():768] calling init triggers
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_init.py:init():773] wandb.init called with sweep_config: {}
+config: {'note': 'three continuous charts, both runs, from train.log', '_wandb': {}}
+2026-07-21 14:44:26,309 INFO    MainThread:1535950 [wandb_init.py:init():816] starting backend
+2026-07-21 14:44:26,310 INFO    MainThread:1535950 [wandb_init.py:init():831] sending inform_init request
+2026-07-21 14:44:26,468 INFO    MainThread:1535950 [wandb_init.py:init():836] backend started and connected
+2026-07-21 14:44:26,480 INFO    MainThread:1535950 [wandb_init.py:init():906] updated telemetry
+2026-07-21 14:44:26,481 INFO    MainThread:1535950 [wandb_init.py:init():929] communicating run to backend with 90.0 second timeout
+2026-07-21 14:44:26,916 INFO    MainThread:1535950 [wandb_init.py:init():974] starting run threads in backend
+2026-07-21 14:44:26,985 INFO    MainThread:1535950 [wandb_run.py:_console_start():2523] atexit reg
+2026-07-21 14:44:26,985 INFO    MainThread:1535950 [wandb_run.py:_redirect():2373] redirect: wrap_raw
+2026-07-21 14:44:26,985 INFO    MainThread:1535950 [wandb_run.py:_redirect():2442] Wrapping output streams.
+2026-07-21 14:44:26,985 INFO    MainThread:1535950 [wandb_run.py:_redirect():2465] Redirects installed.
+2026-07-21 14:44:26,987 INFO    MainThread:1535950 [wandb_init.py:init():1012] run started, returning control to user process
+2026-07-21 14:44:27,001 INFO    MainThread:1535950 [wandb_run.py:_config_callback():1346] config_cb ('_wandb', 'visualize', 'loss_combined') {'panel_type': 'Vega2', 'panel_config': {'panelDefId': 'wandb/lineseries/v0', 'fieldSettings': {'step': 'step', 'lineKey': 'lineKey', 'lineVal': 'lineVal'}, 'stringSettings': {'title': 'Loss (train vs val)', 'xname': 'epoch'}, 'transform': {'name': 'tableWithLeafColNames'}, 'userQuery': {'queryFields': [{'name': 'runSets', 'args': [{'name': 'runSets', 'value': '${runSets}'}], 'fields': [{'name': 'id', 'fields': []}, {'name': 'name', 'fields': []}, {'name': '_defaultColorIndex', 'fields': []}, {'name': 'summaryTable', 'args': [{'name': 'tableKey', 'value': 'loss_combined_table'}], 'fields': []}]}]}}} None
+2026-07-21 14:44:27,001 INFO    MainThread:1535950 [wandb_run.py:_config_callback():1346] config_cb ('_wandb', 'visualize', 'dice_combined') {'panel_type': 'Vega2', 'panel_config': {'panelDefId': 'wandb/lineseries/v0', 'fieldSettings': {'step': 'step', 'lineKey': 'lineKey', 'lineVal': 'lineVal'}, 'stringSettings': {'title': 'Dice (train vs val)', 'xname': 'epoch'}, 'transform': {'name': 'tableWithLeafColNames'}, 'userQuery': {'queryFields': [{'name': 'runSets', 'args': [{'name': 'runSets', 'value': '${runSets}'}], 'fields': [{'name': 'id', 'fields': []}, {'name': 'name', 'fields': []}, {'name': '_defaultColorIndex', 'fields': []}, {'name': 'summaryTable', 'args': [{'name': 'tableKey', 'value': 'dice_combined_table'}], 'fields': []}]}]}}} None
+2026-07-21 14:44:27,001 INFO    MainThread:1535950 [wandb_run.py:_config_callback():1346] config_cb ('_wandb', 'visualize', 'cldice_combined') {'panel_type': 'Vega2', 'panel_config': {'panelDefId': 'wandb/lineseries/v0', 'fieldSettings': {'step': 'step', 'lineKey': 'lineKey', 'lineVal': 'lineVal'}, 'stringSettings': {'title': 'clDice hard (train vs val)', 'xname': 'epoch'}, 'transform': {'name': 'tableWithLeafColNames'}, 'userQuery': {'queryFields': [{'name': 'runSets', 'args': [{'name': 'runSets', 'value': '${runSets}'}], 'fields': [{'name': 'id', 'fields': []}, {'name': 'name', 'fields': []}, {'name': '_defaultColorIndex', 'fields': []}, {'name': 'summaryTable', 'args': [{'name': 'tableKey', 'value': 'cldice_combined_table'}], 'fields': []}]}]}}} None
+2026-07-21 14:44:28,245 INFO    MainThread:1535950 [wandb_run.py:_finish():2285] finishing run georgios-margaritis-institute-polytechnique-de-paris/airway-bvae/i85uo8pk
+2026-07-21 14:44:28,245 INFO    MainThread:1535950 [wandb_run.py:_atexit_cleanup():2490] got exitcode: 0
+2026-07-21 14:44:28,245 INFO    MainThread:1535950 [wandb_run.py:_restore():2472] restore
+2026-07-21 14:44:28,246 INFO    MainThread:1535950 [wandb_run.py:_restore():2478] restore done
+2026-07-21 14:44:31,153 INFO    MainThread:1535950 [wandb_run.py:_footer_sync_info():3895] logging synced files

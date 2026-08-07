@@ -1,0 +1,170 @@
+from __future__ import annotations 
+from dataclasses import dataclass
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+
+# ---------------------------------------------------------------------------
+# Building blocks
+# ---------------------------------------------------------------------------
+
+def _conv_block(in_ch, out_ch, stride, padding, kernel_size=3, dropout: float = 0.0):
+    layers = [
+        nn.Conv3d(in_ch, out_ch, kernel_size=kernel_size, stride=stride,
+                  padding=padding, bias=False),
+        nn.InstanceNorm3d(out_ch, affine=True),
+        nn.ELU(inplace=True),
+    ]
+    if dropout > 0:
+        layers.append(nn.Dropout3d(dropout))
+    return nn.Sequential(*layers)
+
+
+def _upsample_conv_block(in_ch, out_ch, target_size, kernel_size=3, padding=1,
+                         activation=True, dropout: float = 0.0):
+    layers = [
+        nn.Upsample(size=(target_size,)*3, mode='nearest'),
+        nn.Conv3d(in_ch, out_ch, kernel_size=kernel_size, stride=1,
+                  padding=padding, bias=False),
+        nn.InstanceNorm3d(out_ch, affine=True),
+    ]
+    if activation:
+        layers.append(nn.ELU(inplace=True))
+    if dropout > 0:
+        layers.append(nn.Dropout3d(dropout))
+    return nn.Sequential(*layers)
+
+# ---------------------------------------------------------------------------
+# Model
+# ---------------------------------------------------------------------------
+
+class AE128(nn.Module):
+    """
+    AE on 128x128x128 occupancy grids. Encoder: 128 -> 64 -> 32 -> 16 -> 8 -> 4 with channels 16/32/64/128/128.
+    """
+
+    def __init__(self, num_latents: int = 100, n_channels: int = 1, base_ch: int = 4, fc_dim: int = 343, dropout: float = 0.0, latent_dropout: float = 0.0):
+        super().__init__()
+        self.num_latents = num_latents # number of dimensions in the latent space
+        self.dropout_p = dropout
+        p = dropout
+        
+        # channel sizes -- Doubling at EVERY layer
+        c1  = base_ch          # 4
+        c2  = base_ch * 2      # 8
+        c3  = base_ch * 4      # 16
+        c4  = base_ch * 8      # 32
+        c5  = base_ch * 16     # 64
+        c6  = base_ch * 32     # 256
+        c7  = base_ch * 64     # 512
+        c8  = base_ch * 128    # 1024
+        
+
+         # ---- Encoder: 10 Layers (Alternating strides, strictly doubling channels) ----
+        self.enc1 = _conv_block(n_channels, c1, kernel_size=3, stride=1, padding=0)
+        self.enc2 = _conv_block(c1, c2, kernel_size=3, stride=2, padding=1)
+        self.enc3 = _conv_block(c2, c3, kernel_size=3, stride=1, padding=0)
+        self.enc4 = _conv_block(c3, c4, kernel_size=3, stride=2, padding=1)
+        self.enc5 = _conv_block(c4, c5, kernel_size=3, stride=1, padding=0, dropout=p)
+        self.enc6 = _conv_block(c5, c6, kernel_size=3, stride=2, padding=1, dropout=p)
+        self.enc7 = _conv_block(c6, c7, kernel_size=3, stride=1, padding=0, dropout=p)
+        self.enc8 = _conv_block(c7, c8, kernel_size=3, stride=2, padding=1, dropout=p)
+        
+        # 1x1x1 Conv to reduce channels before flattening
+        self.enc_reduce = nn.Sequential(nn.Conv3d(c8, 32, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.InstanceNorm3d(32, affine=True), # Using your updated norm
+            nn.ELU(inplace=True))
+
+        # New flattened dimension: 32 channels * 7 * 7 * 7 spatial grid = 10,976
+        flat_dim = 32 * 7 * 7 * 7   
+
+        self.enc_z = nn.Linear(flat_dim, num_latents, bias=True)
+        # ---- Decoder: 8 Layers (Mirror image) ----
+        # Map latents back to the correct flattened dimension (10,976)
+        self.dec_fc = nn.Sequential( 
+            nn.Linear(num_latents, flat_dim, bias=False), 
+            nn.LayerNorm(flat_dim),
+            nn.ELU(inplace=True))
+               
+        # Unflatten to match the encoder's 32-channel reduction
+        self._dec_unflatten_shape = (32, 7, 7, 7)
+        self.latent_drop = nn.Dropout(latent_dropout) if latent_dropout > 0 else nn.Identity()
+
+        # Shift the 32-channel expansion to start at dec3, mapping up to c8
+        self.dec3  = _conv_block(32, c8, kernel_size=3, stride=1, padding=1, dropout=p)
+        self.dec4  = _upsample_conv_block(c8, c7, target_size=15, dropout=p)
+        self.dec5  = _conv_block(c7, c6, kernel_size=3, stride=1, padding=1, dropout=p)
+        self.dec6  = _upsample_conv_block(c6, c5, target_size=31, dropout=p)
+        self.dec7  = _conv_block(c5, c4, kernel_size=3, stride=1, padding=1, dropout=p)     
+        self.dec8  = _upsample_conv_block(c4, c3, target_size=63)                     
+        self.dec9  = _conv_block(  c3, c2, kernel_size=3, stride=1, padding=1)                
+        self.dec10 = _upsample_conv_block(c2, c1, target_size=128)                  
+        self.dec11 = nn.Conv3d(c1, n_channels, kernel_size=3, stride=1, padding=1, bias=True)
+        self._init_weights()
+
+    def encode(self, x):
+        h = self.enc1(x)
+        h = self.enc2(h) 
+        h = self.enc3(h)
+        h = self.enc4(h)
+        h = self.enc5(h)
+        h = self.enc6(h)
+        h = self.enc7(h)
+        h = self.enc8(h)
+        h = self.enc_reduce(h)    # squashing the 2048 channels down to 32 while keeping the 7x7x7 grid
+        h = h.flatten(1)
+        z = self.enc_z(h)
+        return z
+
+    def decode(self, z):
+        h = self.dec_fc(z)
+        h = h.view(-1, *self._dec_unflatten_shape)
+        h = self.dec3(h)
+        h = self.dec4(h)
+        h = self.dec5(h)
+        h = self.dec6(h)
+        h = self.dec7(h)
+        h = self.dec8(h)
+        h = self.dec9(h)
+        h = self.dec10(h)
+        logits = self.dec11(h)
+        return logits
+    
+    def forward(self, x):
+        z = self.encode(x)
+        return self.decode(self.latent_drop(z))
+
+    def _init_weights(self):
+        """Glorot/Xavier normal init."""
+        for m in self.modules():
+            if isinstance(m, (nn.Conv3d, nn.ConvTranspose3d, nn.Linear)):
+                nn.init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+# ---------------------------------------------------------------------------
+# Loss
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AELossOutput:
+    total: torch.Tensor
+    recon: torch.Tensor
+
+def weighted_bce_with_logits(logits, target_binary, gamma=0.97, eps=1e-7):
+
+    o   = torch.clamp(torch.sigmoid(logits), eps, 1.0 - eps)
+    t   = target_binary
+    pos = gamma * t * torch.log(o)
+    neg = (1.0 - gamma) * (1.0 - t) * torch.log(1.0 - o)
+    return -(pos + neg).flatten(1).sum(dim=1).mean()     # Sum over voxels, average over batch -> per-sample reconstruction NLL
+
+# REPLACE the whole vae_loss(...) with:
+def ae_loss(logits: torch.Tensor, target_binary: torch.Tensor, gamma: float = 0.99) -> AELossOutput:
+    recon = weighted_bce_with_logits(logits, target_binary, gamma=gamma)
+    return AELossOutput(total=recon, recon=recon)
+
+
+
+

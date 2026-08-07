@@ -1,0 +1,1811 @@
+Job 926504 started on node57 at ven. 07 août 2026 00:54:42 CEST
+Allocated CPUs: 4
+SLURM gave CUDA_VISIBLE_DEVICES=0
+NVIDIA L40S, 46068 MiB, 595.84
+---
+--- config in use ---
+batch_size: 16
+epochs: 500
+epochs_til_checkpoint: 1
+keep_every: 100
+expand: -1
+experiment_name: airway_dci_2
+hidden_num: 128
+latent_dim: 128
+hyper_hidden_layers: 3
+logging_root: ./logs
+lr: 0.0001
+max_points: 300000
+model_type: sine
+num_instances: 419       # my actual pair count of data propably -- trainning set -- I am not 100 per cent sure if this is the right number, but I will keep it for now
+on_surface_points: 4000
+point_cloud_path: /home/ids/gmargari-24/airway_project/Data/dgci_data/surface_pts_n_normal
+steps_til_summary: 100---------------------
+surface .mat files : 419   (/home/ids/gmargari-24/airway_project/Data/dgci_data/surface_pts_n_normal)
+free .mat files    : 419   (/home/ids/gmargari-24/airway_project/Data/dgci_data/free_space_pts)
+num_instances      : 419
+torch 2.5.1+cu121 | cuda available: True
+device_count BEFORE train.py overrides CUDA_VISIBLE_DEVICES: 1
+--- preflight OK ---
+/home/ids/gmargari-24/airway_project/Data/dgci_data/surface_pts_n_normal
+Loading point cloud of subject0000
+Finished loading point cloud
+Loading point cloud of subject0001
+Finished loading point cloud
+Loading point cloud of subject0002
+Finished loading point cloud
+Loading point cloud of subject0003
+Finished loading point cloud
+Loading point cloud of subject0004
+Finished loading point cloud
+Loading point cloud of subject0005
+Finished loading point cloud
+Loading point cloud of subject0006
+Finished loading point cloud
+Loading point cloud of subject0007
+Finished loading point cloud
+Loading point cloud of subject0008
+Finished loading point cloud
+Loading point cloud of subject0009
+Finished loading point cloud
+Loading point cloud of subject0010
+Finished loading point cloud
+Loading point cloud of subject0011
+Finished loading point cloud
+Loading point cloud of subject0012
+Finished loading point cloud
+Loading point cloud of subject0013
+Finished loading point cloud
+Loading point cloud of subject0014
+Finished loading point cloud
+Loading point cloud of subject0015
+Finished loading point cloud
+Loading point cloud of subject0016
+Finished loading point cloud
+Loading point cloud of subject0017
+Finished loading point cloud
+Loading point cloud of subject0018
+Finished loading point cloud
+Loading point cloud of subject0019
+Finished loading point cloud
+Loading point cloud of subject0020
+Finished loading point cloud
+Loading point cloud of subject0021
+Finished loading point cloud
+Loading point cloud of subject0022
+Finished loading point cloud
+Loading point cloud of subject0023
+Finished loading point cloud
+Loading point cloud of subject0024
+Finished loading point cloud
+Loading point cloud of subject0025
+Finished loading point cloud
+Loading point cloud of subject0026
+Finished loading point cloud
+Loading point cloud of subject0027
+Finished loading point cloud
+Loading point cloud of subject0028
+Finished loading point cloud
+Loading point cloud of subject0029
+Finished loading point cloud
+Loading point cloud of subject0030
+Finished loading point cloud
+Loading point cloud of subject0031
+Finished loading point cloud
+Loading point cloud of subject0032
+Finished loading point cloud
+Loading point cloud of subject0033
+Finished loading point cloud
+Loading point cloud of subject0034
+Finished loading point cloud
+Loading point cloud of subject0035
+Finished loading point cloud
+Loading point cloud of subject0036
+Finished loading point cloud
+Loading point cloud of subject0037
+Finished loading point cloud
+Loading point cloud of subject0038
+Finished loading point cloud
+Loading point cloud of subject0039
+Finished loading point cloud
+Loading point cloud of subject0040
+Finished loading point cloud
+Loading point cloud of subject0041
+Finished loading point cloud
+Loading point cloud of subject0042
+Finished loading point cloud
+Loading point cloud of subject0043
+Finished loading point cloud
+Loading point cloud of subject0044
+Finished loading point cloud
+Loading point cloud of subject0045
+Finished loading point cloud
+Loading point cloud of subject0046
+Finished loading point cloud
+Loading point cloud of subject0047
+Finished loading point cloud
+Loading point cloud of subject0048
+Finished loading point cloud
+Loading point cloud of subject0049
+Finished loading point cloud
+Loading point cloud of subject0050
+Finished loading point cloud
+Loading point cloud of subject0051
+Finished loading point cloud
+Loading point cloud of subject0052
+Finished loading point cloud
+Loading point cloud of subject0053
+Finished loading point cloud
+Loading point cloud of subject0054
+Finished loading point cloud
+Loading point cloud of subject0055
+Finished loading point cloud
+Loading point cloud of subject0056
+Finished loading point cloud
+Loading point cloud of subject0057
+Finished loading point cloud
+Loading point cloud of subject0058
+Finished loading point cloud
+Loading point cloud of subject0059
+Finished loading point cloud
+Loading point cloud of subject0060
+Finished loading point cloud
+Loading point cloud of subject0061
+Finished loading point cloud
+Loading point cloud of subject0062
+Finished loading point cloud
+Loading point cloud of subject0063
+Finished loading point cloud
+Loading point cloud of subject0064
+Finished loading point cloud
+Loading point cloud of subject0065
+Finished loading point cloud
+Loading point cloud of subject0066
+Finished loading point cloud
+Loading point cloud of subject0067
+Finished loading point cloud
+Loading point cloud of subject0068
+Finished loading point cloud
+Loading point cloud of subject0069
+Finished loading point cloud
+Loading point cloud of subject0070
+Finished loading point cloud
+Loading point cloud of subject0071
+Finished loading point cloud
+Loading point cloud of subject0072
+Finished loading point cloud
+Loading point cloud of subject0073
+Finished loading point cloud
+Loading point cloud of subject0074
+Finished loading point cloud
+Loading point cloud of subject0075
+Finished loading point cloud
+Loading point cloud of subject0076
+Finished loading point cloud
+Loading point cloud of subject0077
+Finished loading point cloud
+Loading point cloud of subject0078
+Finished loading point cloud
+Loading point cloud of subject0079
+Finished loading point cloud
+Loading point cloud of subject0080
+Finished loading point cloud
+Loading point cloud of subject0081
+Finished loading point cloud
+Loading point cloud of subject0082
+Finished loading point cloud
+Loading point cloud of subject0083
+Finished loading point cloud
+Loading point cloud of subject0084
+Finished loading point cloud
+Loading point cloud of subject0085
+Finished loading point cloud
+Loading point cloud of subject0086
+Finished loading point cloud
+Loading point cloud of subject0087
+Finished loading point cloud
+Loading point cloud of subject0088
+Finished loading point cloud
+Loading point cloud of subject0089
+Finished loading point cloud
+Loading point cloud of subject0090
+Finished loading point cloud
+Loading point cloud of subject0091
+Finished loading point cloud
+Loading point cloud of subject0092
+Finished loading point cloud
+Loading point cloud of subject0093
+Finished loading point cloud
+Loading point cloud of subject0094
+Finished loading point cloud
+Loading point cloud of subject0095
+Finished loading point cloud
+Loading point cloud of subject0096
+Finished loading point cloud
+Loading point cloud of subject0097
+Finished loading point cloud
+Loading point cloud of subject0098
+Finished loading point cloud
+Loading point cloud of subject0099
+Finished loading point cloud
+Loading point cloud of subject0100
+Finished loading point cloud
+Loading point cloud of subject0101
+Finished loading point cloud
+Loading point cloud of subject0102
+Finished loading point cloud
+Loading point cloud of subject0103
+Finished loading point cloud
+Loading point cloud of subject0104
+Finished loading point cloud
+Loading point cloud of subject0105
+Finished loading point cloud
+Loading point cloud of subject0106
+Finished loading point cloud
+Loading point cloud of subject0107
+Finished loading point cloud
+Loading point cloud of subject0108
+Finished loading point cloud
+Loading point cloud of subject0109
+Finished loading point cloud
+Loading point cloud of subject0110
+Finished loading point cloud
+Loading point cloud of subject0111
+Finished loading point cloud
+Loading point cloud of subject0112
+Finished loading point cloud
+Loading point cloud of subject0113
+Finished loading point cloud
+Loading point cloud of subject0114
+Finished loading point cloud
+Loading point cloud of subject0115
+Finished loading point cloud
+Loading point cloud of subject0116
+Finished loading point cloud
+Loading point cloud of subject0117
+Finished loading point cloud
+Loading point cloud of subject0118
+Finished loading point cloud
+Loading point cloud of subject0119
+Finished loading point cloud
+Loading point cloud of subject0120
+Finished loading point cloud
+Loading point cloud of subject0121
+Finished loading point cloud
+Loading point cloud of subject0122
+Finished loading point cloud
+Loading point cloud of subject0123
+Finished loading point cloud
+Loading point cloud of subject0124
+Finished loading point cloud
+Loading point cloud of subject0125
+Finished loading point cloud
+Loading point cloud of subject0126
+Finished loading point cloud
+Loading point cloud of subject0127
+Finished loading point cloud
+Loading point cloud of subject0128
+Finished loading point cloud
+Loading point cloud of subject0129
+Finished loading point cloud
+Loading point cloud of subject0130
+Finished loading point cloud
+Loading point cloud of subject0131
+Finished loading point cloud
+Loading point cloud of subject0132
+Finished loading point cloud
+Loading point cloud of subject0133
+Finished loading point cloud
+Loading point cloud of subject0134
+Finished loading point cloud
+Loading point cloud of subject0135
+Finished loading point cloud
+Loading point cloud of subject0136
+Finished loading point cloud
+Loading point cloud of subject0137
+Finished loading point cloud
+Loading point cloud of subject0138
+Finished loading point cloud
+Loading point cloud of subject0139
+Finished loading point cloud
+Loading point cloud of subject0140
+Finished loading point cloud
+Loading point cloud of subject0141
+Finished loading point cloud
+Loading point cloud of subject0142
+Finished loading point cloud
+Loading point cloud of subject0143
+Finished loading point cloud
+Loading point cloud of subject0144
+Finished loading point cloud
+Loading point cloud of subject0145
+Finished loading point cloud
+Loading point cloud of subject0146
+Finished loading point cloud
+Loading point cloud of subject0147
+Finished loading point cloud
+Loading point cloud of subject0148
+Finished loading point cloud
+Loading point cloud of subject0149
+Finished loading point cloud
+Loading point cloud of subject0150
+Finished loading point cloud
+Loading point cloud of subject0151
+Finished loading point cloud
+Loading point cloud of subject0152
+Finished loading point cloud
+Loading point cloud of subject0153
+Finished loading point cloud
+Loading point cloud of subject0154
+Finished loading point cloud
+Loading point cloud of subject0155
+Finished loading point cloud
+Loading point cloud of subject0156
+Finished loading point cloud
+Loading point cloud of subject0157
+Finished loading point cloud
+Loading point cloud of subject0158
+Finished loading point cloud
+Loading point cloud of subject0159
+Finished loading point cloud
+Loading point cloud of subject0160
+Finished loading point cloud
+Loading point cloud of subject0161
+Finished loading point cloud
+Loading point cloud of subject0162
+Finished loading point cloud
+Loading point cloud of subject0163
+Finished loading point cloud
+Loading point cloud of subject0164
+Finished loading point cloud
+Loading point cloud of subject0165
+Finished loading point cloud
+Loading point cloud of subject0166
+Finished loading point cloud
+Loading point cloud of subject0167
+Finished loading point cloud
+Loading point cloud of subject0168
+Finished loading point cloud
+Loading point cloud of subject0169
+Finished loading point cloud
+Loading point cloud of subject0170
+Finished loading point cloud
+Loading point cloud of subject0171
+Finished loading point cloud
+Loading point cloud of subject0172
+Finished loading point cloud
+Loading point cloud of subject0173
+Finished loading point cloud
+Loading point cloud of subject0174
+Finished loading point cloud
+Loading point cloud of subject0175
+Finished loading point cloud
+Loading point cloud of subject0176
+Finished loading point cloud
+Loading point cloud of subject0177
+Finished loading point cloud
+Loading point cloud of subject0178
+Finished loading point cloud
+Loading point cloud of subject0179
+Finished loading point cloud
+Loading point cloud of subject0180
+Finished loading point cloud
+Loading point cloud of subject0181
+Finished loading point cloud
+Loading point cloud of subject0182
+Finished loading point cloud
+Loading point cloud of subject0183
+Finished loading point cloud
+Loading point cloud of subject0184
+Finished loading point cloud
+Loading point cloud of subject0185
+Finished loading point cloud
+Loading point cloud of subject0186
+Finished loading point cloud
+Loading point cloud of subject0187
+Finished loading point cloud
+Loading point cloud of subject0188
+Finished loading point cloud
+Loading point cloud of subject0189
+Finished loading point cloud
+Loading point cloud of subject0190
+Finished loading point cloud
+Loading point cloud of subject0191
+Finished loading point cloud
+Loading point cloud of subject0192
+Finished loading point cloud
+Loading point cloud of subject0193
+Finished loading point cloud
+Loading point cloud of subject0194
+Finished loading point cloud
+Loading point cloud of subject0195
+Finished loading point cloud
+Loading point cloud of subject0196
+Finished loading point cloud
+Loading point cloud of subject0197
+Finished loading point cloud
+Loading point cloud of subject0198
+Finished loading point cloud
+Loading point cloud of subject0199
+Finished loading point cloud
+Loading point cloud of subject0200
+Finished loading point cloud
+Loading point cloud of subject0201
+Finished loading point cloud
+Loading point cloud of subject0202
+Finished loading point cloud
+Loading point cloud of subject0203
+Finished loading point cloud
+Loading point cloud of subject0204
+Finished loading point cloud
+Loading point cloud of subject0205
+Finished loading point cloud
+Loading point cloud of subject0206
+Finished loading point cloud
+Loading point cloud of subject0207
+Finished loading point cloud
+Loading point cloud of subject0208
+Finished loading point cloud
+Loading point cloud of subject0209
+Finished loading point cloud
+Loading point cloud of subject0210
+Finished loading point cloud
+Loading point cloud of subject0211
+Finished loading point cloud
+Loading point cloud of subject0212
+Finished loading point cloud
+Loading point cloud of subject0213
+Finished loading point cloud
+Loading point cloud of subject0214
+Finished loading point cloud
+Loading point cloud of subject0215
+Finished loading point cloud
+Loading point cloud of subject0216
+Finished loading point cloud
+Loading point cloud of subject0217
+Finished loading point cloud
+Loading point cloud of subject0218
+Finished loading point cloud
+Loading point cloud of subject0219
+Finished loading point cloud
+Loading point cloud of subject0220
+Finished loading point cloud
+Loading point cloud of subject0221
+Finished loading point cloud
+Loading point cloud of subject0222
+Finished loading point cloud
+Loading point cloud of subject0223
+Finished loading point cloud
+Loading point cloud of subject0224
+Finished loading point cloud
+Loading point cloud of subject0225
+Finished loading point cloud
+Loading point cloud of subject0226
+Finished loading point cloud
+Loading point cloud of subject0227
+Finished loading point cloud
+Loading point cloud of subject0228
+Finished loading point cloud
+Loading point cloud of subject0229
+Finished loading point cloud
+Loading point cloud of subject0230
+Finished loading point cloud
+Loading point cloud of subject0231
+Finished loading point cloud
+Loading point cloud of subject0232
+Finished loading point cloud
+Loading point cloud of subject0233
+Finished loading point cloud
+Loading point cloud of subject0234
+Finished loading point cloud
+Loading point cloud of subject0235
+Finished loading point cloud
+Loading point cloud of subject0236
+Finished loading point cloud
+Loading point cloud of subject0237
+Finished loading point cloud
+Loading point cloud of subject0238
+Finished loading point cloud
+Loading point cloud of subject0239
+Finished loading point cloud
+Loading point cloud of subject0240
+Finished loading point cloud
+Loading point cloud of subject0241
+Finished loading point cloud
+Loading point cloud of subject0242
+Finished loading point cloud
+Loading point cloud of subject0243
+Finished loading point cloud
+Loading point cloud of subject0244
+Finished loading point cloud
+Loading point cloud of subject0245
+Finished loading point cloud
+Loading point cloud of subject0246
+Finished loading point cloud
+Loading point cloud of subject0247
+Finished loading point cloud
+Loading point cloud of subject0248
+Finished loading point cloud
+Loading point cloud of subject0249
+Finished loading point cloud
+Loading point cloud of subject0250
+Finished loading point cloud
+Loading point cloud of subject0251
+Finished loading point cloud
+Loading point cloud of subject0252
+Finished loading point cloud
+Loading point cloud of subject0253
+Finished loading point cloud
+Loading point cloud of subject0254
+Finished loading point cloud
+Loading point cloud of subject0255
+Finished loading point cloud
+Loading point cloud of subject0256
+Finished loading point cloud
+Loading point cloud of subject0257
+Finished loading point cloud
+Loading point cloud of subject0258
+Finished loading point cloud
+Loading point cloud of subject0259
+Finished loading point cloud
+Loading point cloud of subject0260
+Finished loading point cloud
+Loading point cloud of subject0261
+Finished loading point cloud
+Loading point cloud of subject0262
+Finished loading point cloud
+Loading point cloud of subject0263
+Finished loading point cloud
+Loading point cloud of subject0264
+Finished loading point cloud
+Loading point cloud of subject0265
+Finished loading point cloud
+Loading point cloud of subject0266
+Finished loading point cloud
+Loading point cloud of subject0267
+Finished loading point cloud
+Loading point cloud of subject0268
+Finished loading point cloud
+Loading point cloud of subject0269
+Finished loading point cloud
+Loading point cloud of subject0270
+Finished loading point cloud
+Loading point cloud of subject0271
+Finished loading point cloud
+Loading point cloud of subject0272
+Finished loading point cloud
+Loading point cloud of subject0273
+Finished loading point cloud
+Loading point cloud of subject0274
+Finished loading point cloud
+Loading point cloud of subject0275
+Finished loading point cloud
+Loading point cloud of subject0276
+Finished loading point cloud
+Loading point cloud of subject0277
+Finished loading point cloud
+Loading point cloud of subject0278
+Finished loading point cloud
+Loading point cloud of subject0279
+Finished loading point cloud
+Loading point cloud of subject0280
+Finished loading point cloud
+Loading point cloud of subject0281
+Finished loading point cloud
+Loading point cloud of subject0282
+Finished loading point cloud
+Loading point cloud of subject0283
+Finished loading point cloud
+Loading point cloud of subject0284
+Finished loading point cloud
+Loading point cloud of subject0285
+Finished loading point cloud
+Loading point cloud of subject0286
+Finished loading point cloud
+Loading point cloud of subject0287
+Finished loading point cloud
+Loading point cloud of subject0288
+Finished loading point cloud
+Loading point cloud of subject0289
+Finished loading point cloud
+Loading point cloud of subject0290
+Finished loading point cloud
+Loading point cloud of subject0291
+Finished loading point cloud
+Loading point cloud of subject0292
+Finished loading point cloud
+Loading point cloud of subject0293
+Finished loading point cloud
+Loading point cloud of subject0294
+Finished loading point cloud
+Loading point cloud of subject0295
+Finished loading point cloud
+Loading point cloud of subject0296
+Finished loading point cloud
+Loading point cloud of subject0297
+Finished loading point cloud
+Loading point cloud of subject0298
+Finished loading point cloud
+Loading point cloud of subject0299
+Finished loading point cloud
+Loading point cloud of subject0300
+Finished loading point cloud
+Loading point cloud of subject0301
+Finished loading point cloud
+Loading point cloud of subject0302
+Finished loading point cloud
+Loading point cloud of subject0303
+Finished loading point cloud
+Loading point cloud of subject0304
+Finished loading point cloud
+Loading point cloud of subject0305
+Finished loading point cloud
+Loading point cloud of subject0306
+Finished loading point cloud
+Loading point cloud of subject0307
+Finished loading point cloud
+Loading point cloud of subject0308
+Finished loading point cloud
+Loading point cloud of subject0309
+Finished loading point cloud
+Loading point cloud of subject0310
+Finished loading point cloud
+Loading point cloud of subject0311
+Finished loading point cloud
+Loading point cloud of subject0312
+Finished loading point cloud
+Loading point cloud of subject0313
+Finished loading point cloud
+Loading point cloud of subject0314
+Finished loading point cloud
+Loading point cloud of subject0315
+Finished loading point cloud
+Loading point cloud of subject0316
+Finished loading point cloud
+Loading point cloud of subject0317
+Finished loading point cloud
+Loading point cloud of subject0318
+Finished loading point cloud
+Loading point cloud of subject0319
+Finished loading point cloud
+Loading point cloud of subject0320
+Finished loading point cloud
+Loading point cloud of subject0321
+Finished loading point cloud
+Loading point cloud of subject0322
+Finished loading point cloud
+Loading point cloud of subject0323
+Finished loading point cloud
+Loading point cloud of subject0324
+Finished loading point cloud
+Loading point cloud of subject0325
+Finished loading point cloud
+Loading point cloud of subject0326
+Finished loading point cloud
+Loading point cloud of subject0327
+Finished loading point cloud
+Loading point cloud of subject0328
+Finished loading point cloud
+Loading point cloud of subject0329
+Finished loading point cloud
+Loading point cloud of subject0330
+Finished loading point cloud
+Loading point cloud of subject0331
+Finished loading point cloud
+Loading point cloud of subject0332
+Finished loading point cloud
+Loading point cloud of subject0333
+Finished loading point cloud
+Loading point cloud of subject0334
+Finished loading point cloud
+Loading point cloud of subject0335
+Finished loading point cloud
+Loading point cloud of subject0336
+Finished loading point cloud
+Loading point cloud of subject0337
+Finished loading point cloud
+Loading point cloud of subject0338
+Finished loading point cloud
+Loading point cloud of subject0339
+Finished loading point cloud
+Loading point cloud of subject0340
+Finished loading point cloud
+Loading point cloud of subject0341
+Finished loading point cloud
+Loading point cloud of subject0342
+Finished loading point cloud
+Loading point cloud of subject0343
+Finished loading point cloud
+Loading point cloud of subject0344
+Finished loading point cloud
+Loading point cloud of subject0345
+Finished loading point cloud
+Loading point cloud of subject0346
+Finished loading point cloud
+Loading point cloud of subject0347
+Finished loading point cloud
+Loading point cloud of subject0348
+Finished loading point cloud
+Loading point cloud of subject0349
+Finished loading point cloud
+Loading point cloud of subject0350
+Finished loading point cloud
+Loading point cloud of subject0351
+Finished loading point cloud
+Loading point cloud of subject0352
+Finished loading point cloud
+Loading point cloud of subject0353
+Finished loading point cloud
+Loading point cloud of subject0354
+Finished loading point cloud
+Loading point cloud of subject0355
+Finished loading point cloud
+Loading point cloud of subject0356
+Finished loading point cloud
+Loading point cloud of subject0357
+Finished loading point cloud
+Loading point cloud of subject0358
+Finished loading point cloud
+Loading point cloud of subject0359
+Finished loading point cloud
+Loading point cloud of subject0360
+Finished loading point cloud
+Loading point cloud of subject0361
+Finished loading point cloud
+Loading point cloud of subject0362
+Finished loading point cloud
+Loading point cloud of subject0363
+Finished loading point cloud
+Loading point cloud of subject0364
+Finished loading point cloud
+Loading point cloud of subject0365
+Finished loading point cloud
+Loading point cloud of subject0366
+Finished loading point cloud
+Loading point cloud of subject0367
+Finished loading point cloud
+Loading point cloud of subject0368
+Finished loading point cloud
+Loading point cloud of subject0369
+Finished loading point cloud
+Loading point cloud of subject0370
+Finished loading point cloud
+Loading point cloud of subject0371
+Finished loading point cloud
+Loading point cloud of subject0372
+Finished loading point cloud
+Loading point cloud of subject0373
+Finished loading point cloud
+Loading point cloud of subject0374
+Finished loading point cloud
+Loading point cloud of subject0375
+Finished loading point cloud
+Loading point cloud of subject0376
+Finished loading point cloud
+Loading point cloud of subject0377
+Finished loading point cloud
+Loading point cloud of subject0378
+Finished loading point cloud
+Loading point cloud of subject0379
+Finished loading point cloud
+Loading point cloud of subject0380
+Finished loading point cloud
+Loading point cloud of subject0381
+Finished loading point cloud
+Loading point cloud of subject0382
+Finished loading point cloud
+Loading point cloud of subject0383
+Finished loading point cloud
+Loading point cloud of subject0384
+Finished loading point cloud
+Loading point cloud of subject0385
+Finished loading point cloud
+Loading point cloud of subject0386
+Finished loading point cloud
+Loading point cloud of subject0387
+Finished loading point cloud
+Loading point cloud of subject0388
+Finished loading point cloud
+Loading point cloud of subject0389
+Finished loading point cloud
+Loading point cloud of subject0390
+Finished loading point cloud
+Loading point cloud of subject0391
+Finished loading point cloud
+Loading point cloud of subject0392
+Finished loading point cloud
+Loading point cloud of subject0393
+Finished loading point cloud
+Loading point cloud of subject0394
+Finished loading point cloud
+Loading point cloud of subject0395
+Finished loading point cloud
+Loading point cloud of subject0396
+Finished loading point cloud
+Loading point cloud of subject0397
+Finished loading point cloud
+Loading point cloud of subject0398
+Finished loading point cloud
+Loading point cloud of subject0399
+Finished loading point cloud
+Loading point cloud of subject0400
+Finished loading point cloud
+Loading point cloud of subject0401
+Finished loading point cloud
+Loading point cloud of subject0402
+Finished loading point cloud
+Loading point cloud of subject0403
+Finished loading point cloud
+Loading point cloud of subject0404
+Finished loading point cloud
+Loading point cloud of subject0405
+Finished loading point cloud
+Loading point cloud of subject0406
+Finished loading point cloud
+Loading point cloud of subject0407
+Finished loading point cloud
+Loading point cloud of subject0408
+Finished loading point cloud
+Loading point cloud of subject0409
+Finished loading point cloud
+Loading point cloud of subject0410
+Finished loading point cloud
+Loading point cloud of subject0411
+Finished loading point cloud
+Loading point cloud of subject0412
+Finished loading point cloud
+Loading point cloud of subject0413
+Finished loading point cloud
+Loading point cloud of subject0414
+Finished loading point cloud
+Loading point cloud of subject0415
+Finished loading point cloud
+Loading point cloud of subject0416
+Finished loading point cloud
+Loading point cloud of subject0417
+Finished loading point cloud
+Loading point cloud of subject0418
+Finished loading point cloud
+/home/ids/gmargari-24/airway_project/Data/dgci_data/surface_pts_n_normal
+Loading point cloud of subject0000
+Finished loading point cloud
+Loading point cloud of subject0001
+Finished loading point cloud
+Loading point cloud of subject0002
+Finished loading point cloud
+Loading point cloud of subject0003
+Finished loading point cloud
+Loading point cloud of subject0004
+Finished loading point cloud
+Loading point cloud of subject0005
+Finished loading point cloud
+Loading point cloud of subject0006
+Finished loading point cloud
+Loading point cloud of subject0007
+Finished loading point cloud
+Loading point cloud of subject0008
+Finished loading point cloud
+Loading point cloud of subject0009
+Finished loading point cloud
+Loading point cloud of subject0010
+Finished loading point cloud
+Loading point cloud of subject0011
+Finished loading point cloud
+Loading point cloud of subject0012
+Finished loading point cloud
+Loading point cloud of subject0013
+Finished loading point cloud
+Loading point cloud of subject0014
+Finished loading point cloud
+Loading point cloud of subject0015
+Finished loading point cloud
+Loading point cloud of subject0016
+Finished loading point cloud
+Loading point cloud of subject0017
+Finished loading point cloud
+Loading point cloud of subject0018
+Finished loading point cloud
+Loading point cloud of subject0019
+Finished loading point cloud
+Loading point cloud of subject0020
+Finished loading point cloud
+Loading point cloud of subject0021
+Finished loading point cloud
+Loading point cloud of subject0022
+Finished loading point cloud
+Loading point cloud of subject0023
+Finished loading point cloud
+Loading point cloud of subject0024
+Finished loading point cloud
+Loading point cloud of subject0025
+Finished loading point cloud
+Loading point cloud of subject0026
+Finished loading point cloud
+Loading point cloud of subject0027
+Finished loading point cloud
+Loading point cloud of subject0028
+Finished loading point cloud
+Loading point cloud of subject0029
+Finished loading point cloud
+Loading point cloud of subject0030
+Finished loading point cloud
+Loading point cloud of subject0031
+Finished loading point cloud
+Loading point cloud of subject0032
+Finished loading point cloud
+Loading point cloud of subject0033
+Finished loading point cloud
+Loading point cloud of subject0034
+Finished loading point cloud
+Loading point cloud of subject0035
+Finished loading point cloud
+Loading point cloud of subject0036
+Finished loading point cloud
+Loading point cloud of subject0037
+Finished loading point cloud
+Loading point cloud of subject0038
+Finished loading point cloud
+Loading point cloud of subject0039
+Finished loading point cloud
+Loading point cloud of subject0040
+Finished loading point cloud
+Loading point cloud of subject0041
+Finished loading point cloud
+Loading point cloud of subject0042
+Finished loading point cloud
+Loading point cloud of subject0043
+Finished loading point cloud
+Loading point cloud of subject0044
+Finished loading point cloud
+Loading point cloud of subject0045
+Finished loading point cloud
+Loading point cloud of subject0046
+Finished loading point cloud
+Loading point cloud of subject0047
+Finished loading point cloud
+Loading point cloud of subject0048
+Finished loading point cloud
+Loading point cloud of subject0049
+Finished loading point cloud
+Loading point cloud of subject0050
+Finished loading point cloud
+Loading point cloud of subject0051
+Finished loading point cloud
+Loading point cloud of subject0052
+Finished loading point cloud
+Loading point cloud of subject0053
+Finished loading point cloud
+Loading point cloud of subject0054
+Finished loading point cloud
+Loading point cloud of subject0055
+Finished loading point cloud
+Loading point cloud of subject0056
+Finished loading point cloud
+Loading point cloud of subject0057
+Finished loading point cloud
+Loading point cloud of subject0058
+Finished loading point cloud
+Loading point cloud of subject0059
+Finished loading point cloud
+Loading point cloud of subject0060
+Finished loading point cloud
+Loading point cloud of subject0061
+Finished loading point cloud
+Loading point cloud of subject0062
+Finished loading point cloud
+Loading point cloud of subject0063
+Finished loading point cloud
+Loading point cloud of subject0064
+Finished loading point cloud
+Loading point cloud of subject0065
+Finished loading point cloud
+Loading point cloud of subject0066
+Finished loading point cloud
+Loading point cloud of subject0067
+Finished loading point cloud
+Loading point cloud of subject0068
+Finished loading point cloud
+Loading point cloud of subject0069
+Finished loading point cloud
+Loading point cloud of subject0070
+Finished loading point cloud
+Loading point cloud of subject0071
+Finished loading point cloud
+Loading point cloud of subject0072
+Finished loading point cloud
+Loading point cloud of subject0073
+Finished loading point cloud
+Loading point cloud of subject0074
+Finished loading point cloud
+Loading point cloud of subject0075
+Finished loading point cloud
+Loading point cloud of subject0076
+Finished loading point cloud
+Loading point cloud of subject0077
+Finished loading point cloud
+Loading point cloud of subject0078
+Finished loading point cloud
+Loading point cloud of subject0079
+Finished loading point cloud
+Loading point cloud of subject0080
+Finished loading point cloud
+Loading point cloud of subject0081
+Finished loading point cloud
+Loading point cloud of subject0082
+Finished loading point cloud
+Loading point cloud of subject0083
+Finished loading point cloud
+Loading point cloud of subject0084
+Finished loading point cloud
+Loading point cloud of subject0085
+Finished loading point cloud
+Loading point cloud of subject0086
+Finished loading point cloud
+Loading point cloud of subject0087
+Finished loading point cloud
+Loading point cloud of subject0088
+Finished loading point cloud
+Loading point cloud of subject0089
+Finished loading point cloud
+Loading point cloud of subject0090
+Finished loading point cloud
+Loading point cloud of subject0091
+Finished loading point cloud
+Loading point cloud of subject0092
+Finished loading point cloud
+Loading point cloud of subject0093
+Finished loading point cloud
+Loading point cloud of subject0094
+Finished loading point cloud
+Loading point cloud of subject0095
+Finished loading point cloud
+Loading point cloud of subject0096
+Finished loading point cloud
+Loading point cloud of subject0097
+Finished loading point cloud
+Loading point cloud of subject0098
+Finished loading point cloud
+Loading point cloud of subject0099
+Finished loading point cloud
+Loading point cloud of subject0100
+Finished loading point cloud
+Loading point cloud of subject0101
+Finished loading point cloud
+Loading point cloud of subject0102
+Finished loading point cloud
+Loading point cloud of subject0103
+Finished loading point cloud
+Loading point cloud of subject0104
+Finished loading point cloud
+Loading point cloud of subject0105
+Finished loading point cloud
+Loading point cloud of subject0106
+Finished loading point cloud
+Loading point cloud of subject0107
+Finished loading point cloud
+Loading point cloud of subject0108
+Finished loading point cloud
+Loading point cloud of subject0109
+Finished loading point cloud
+Loading point cloud of subject0110
+Finished loading point cloud
+Loading point cloud of subject0111
+Finished loading point cloud
+Loading point cloud of subject0112
+Finished loading point cloud
+Loading point cloud of subject0113
+Finished loading point cloud
+Loading point cloud of subject0114
+Finished loading point cloud
+Loading point cloud of subject0115
+Finished loading point cloud
+Loading point cloud of subject0116
+Finished loading point cloud
+Loading point cloud of subject0117
+Finished loading point cloud
+Loading point cloud of subject0118
+Finished loading point cloud
+Loading point cloud of subject0119
+Finished loading point cloud
+Loading point cloud of subject0120
+Finished loading point cloud
+Loading point cloud of subject0121
+Finished loading point cloud
+Loading point cloud of subject0122
+Finished loading point cloud
+Loading point cloud of subject0123
+Finished loading point cloud
+Loading point cloud of subject0124
+Finished loading point cloud
+Loading point cloud of subject0125
+Finished loading point cloud
+Loading point cloud of subject0126
+Finished loading point cloud
+Loading point cloud of subject0127
+Finished loading point cloud
+Loading point cloud of subject0128
+Finished loading point cloud
+Loading point cloud of subject0129
+Finished loading point cloud
+Loading point cloud of subject0130
+Finished loading point cloud
+Loading point cloud of subject0131
+Finished loading point cloud
+Loading point cloud of subject0132
+Finished loading point cloud
+Loading point cloud of subject0133
+Finished loading point cloud
+Loading point cloud of subject0134
+Finished loading point cloud
+Loading point cloud of subject0135
+Finished loading point cloud
+Loading point cloud of subject0136
+Finished loading point cloud
+Loading point cloud of subject0137
+Finished loading point cloud
+Loading point cloud of subject0138
+Finished loading point cloud
+Loading point cloud of subject0139
+Finished loading point cloud
+Loading point cloud of subject0140
+Finished loading point cloud
+Loading point cloud of subject0141
+Finished loading point cloud
+Loading point cloud of subject0142
+Finished loading point cloud
+Loading point cloud of subject0143
+Finished loading point cloud
+Loading point cloud of subject0144
+Finished loading point cloud
+Loading point cloud of subject0145
+Finished loading point cloud
+Loading point cloud of subject0146
+Finished loading point cloud
+Loading point cloud of subject0147
+Finished loading point cloud
+Loading point cloud of subject0148
+Finished loading point cloud
+Loading point cloud of subject0149
+Finished loading point cloud
+Loading point cloud of subject0150
+Finished loading point cloud
+Loading point cloud of subject0151
+Finished loading point cloud
+Loading point cloud of subject0152
+Finished loading point cloud
+Loading point cloud of subject0153
+Finished loading point cloud
+Loading point cloud of subject0154
+Finished loading point cloud
+Loading point cloud of subject0155
+Finished loading point cloud
+Loading point cloud of subject0156
+Finished loading point cloud
+Loading point cloud of subject0157
+Finished loading point cloud
+Loading point cloud of subject0158
+Finished loading point cloud
+Loading point cloud of subject0159
+Finished loading point cloud
+Loading point cloud of subject0160
+Finished loading point cloud
+Loading point cloud of subject0161
+Finished loading point cloud
+Loading point cloud of subject0162
+Finished loading point cloud
+Loading point cloud of subject0163
+Finished loading point cloud
+Loading point cloud of subject0164
+Finished loading point cloud
+Loading point cloud of subject0165
+Finished loading point cloud
+Loading point cloud of subject0166
+Finished loading point cloud
+Loading point cloud of subject0167
+Finished loading point cloud
+Loading point cloud of subject0168
+Finished loading point cloud
+Loading point cloud of subject0169
+Finished loading point cloud
+Loading point cloud of subject0170
+Finished loading point cloud
+Loading point cloud of subject0171
+Finished loading point cloud
+Loading point cloud of subject0172
+Finished loading point cloud
+Loading point cloud of subject0173
+Finished loading point cloud
+Loading point cloud of subject0174
+Finished loading point cloud
+Loading point cloud of subject0175
+Finished loading point cloud
+Loading point cloud of subject0176
+Finished loading point cloud
+Loading point cloud of subject0177
+Finished loading point cloud
+Loading point cloud of subject0178
+Finished loading point cloud
+Loading point cloud of subject0179
+Finished loading point cloud
+Loading point cloud of subject0180
+Finished loading point cloud
+Loading point cloud of subject0181
+Finished loading point cloud
+Loading point cloud of subject0182
+Finished loading point cloud
+Loading point cloud of subject0183
+Finished loading point cloud
+Loading point cloud of subject0184
+Finished loading point cloud
+Loading point cloud of subject0185
+Finished loading point cloud
+Loading point cloud of subject0186
+Finished loading point cloud
+Loading point cloud of subject0187
+Finished loading point cloud
+Loading point cloud of subject0188
+Finished loading point cloud
+Loading point cloud of subject0189
+Finished loading point cloud
+Loading point cloud of subject0190
+Finished loading point cloud
+Loading point cloud of subject0191
+Finished loading point cloud
+Loading point cloud of subject0192
+Finished loading point cloud
+Loading point cloud of subject0193
+Finished loading point cloud
+Loading point cloud of subject0194
+Finished loading point cloud
+Loading point cloud of subject0195
+Finished loading point cloud
+Loading point cloud of subject0196
+Finished loading point cloud
+Loading point cloud of subject0197
+Finished loading point cloud
+Loading point cloud of subject0198
+Finished loading point cloud
+Loading point cloud of subject0199
+Finished loading point cloud
+Loading point cloud of subject0200
+Finished loading point cloud
+Loading point cloud of subject0201
+Finished loading point cloud
+Loading point cloud of subject0202
+Finished loading point cloud
+Loading point cloud of subject0203
+Finished loading point cloud
+Loading point cloud of subject0204
+Finished loading point cloud
+Loading point cloud of subject0205
+Finished loading point cloud
+Loading point cloud of subject0206
+Finished loading point cloud
+Loading point cloud of subject0207
+Finished loading point cloud
+Loading point cloud of subject0208
+Finished loading point cloud
+Loading point cloud of subject0209
+Finished loading point cloud
+Loading point cloud of subject0210
+Finished loading point cloud
+Loading point cloud of subject0211
+Finished loading point cloud
+Loading point cloud of subject0212
+Finished loading point cloud
+Loading point cloud of subject0213
+Finished loading point cloud
+Loading point cloud of subject0214
+Finished loading point cloud
+Loading point cloud of subject0215
+Finished loading point cloud
+Loading point cloud of subject0216
+Finished loading point cloud
+Loading point cloud of subject0217
+Finished loading point cloud
+Loading point cloud of subject0218
+Finished loading point cloud
+Loading point cloud of subject0219
+Finished loading point cloud
+Loading point cloud of subject0220
+Finished loading point cloud
+Loading point cloud of subject0221
+Finished loading point cloud
+Loading point cloud of subject0222
+Finished loading point cloud
+Loading point cloud of subject0223
+Finished loading point cloud
+Loading point cloud of subject0224
+Finished loading point cloud
+Loading point cloud of subject0225
+Finished loading point cloud
+Loading point cloud of subject0226
+Finished loading point cloud
+Loading point cloud of subject0227
+Finished loading point cloud
+Loading point cloud of subject0228
+Finished loading point cloud
+Loading point cloud of subject0229
+Finished loading point cloud
+Loading point cloud of subject0230
+Finished loading point cloud
+Loading point cloud of subject0231
+Finished loading point cloud
+Loading point cloud of subject0232
+Finished loading point cloud
+Loading point cloud of subject0233
+Finished loading point cloud
+Loading point cloud of subject0234
+Finished loading point cloud
+Loading point cloud of subject0235
+Finished loading point cloud
+Loading point cloud of subject0236
+Finished loading point cloud
+Loading point cloud of subject0237
+Finished loading point cloud
+Loading point cloud of subject0238
+Finished loading point cloud
+Loading point cloud of subject0239
+Finished loading point cloud
+Loading point cloud of subject0240
+Finished loading point cloud
+Loading point cloud of subject0241
+Finished loading point cloud
+Loading point cloud of subject0242
+Finished loading point cloud
+Loading point cloud of subject0243
+Finished loading point cloud
+Loading point cloud of subject0244
+Finished loading point cloud
+Loading point cloud of subject0245
+Finished loading point cloud
+Loading point cloud of subject0246
+Finished loading point cloud
+Loading point cloud of subject0247
+Finished loading point cloud
+Loading point cloud of subject0248
+Finished loading point cloud
+Loading point cloud of subject0249
+Finished loading point cloud
+Loading point cloud of subject0250
+Finished loading point cloud
+Loading point cloud of subject0251
+Finished loading point cloud
+Loading point cloud of subject0252
+Finished loading point cloud
+Loading point cloud of subject0253
+Finished loading point cloud
+Loading point cloud of subject0254
+Finished loading point cloud
+Loading point cloud of subject0255
+Finished loading point cloud
+Loading point cloud of subject0256
+Finished loading point cloud
+Loading point cloud of subject0257
+Finished loading point cloud
+Loading point cloud of subject0258
+Finished loading point cloud
+Loading point cloud of subject0259
+Finished loading point cloud
+Loading point cloud of subject0260
+Finished loading point cloud
+Loading point cloud of subject0261
+Finished loading point cloud
+Loading point cloud of subject0262
+Finished loading point cloud
+Loading point cloud of subject0263
+Finished loading point cloud
+Loading point cloud of subject0264
+Finished loading point cloud
+Loading point cloud of subject0265
+Finished loading point cloud
+Loading point cloud of subject0266
+Finished loading point cloud
+Loading point cloud of subject0267
+Finished loading point cloud
+Loading point cloud of subject0268
+Finished loading point cloud
+Loading point cloud of subject0269
+Finished loading point cloud
+Loading point cloud of subject0270
+Finished loading point cloud
+Loading point cloud of subject0271
+Finished loading point cloud
+Loading point cloud of subject0272
+Finished loading point cloud
+Loading point cloud of subject0273
+Finished loading point cloud
+Loading point cloud of subject0274
+Finished loading point cloud
+Loading point cloud of subject0275
+Finished loading point cloud
+Loading point cloud of subject0276
+Finished loading point cloud
+Loading point cloud of subject0277
+Finished loading point cloud
+Loading point cloud of subject0278
+Finished loading point cloud
+Loading point cloud of subject0279
+Finished loading point cloud
+Loading point cloud of subject0280
+Finished loading point cloud
+Loading point cloud of subject0281
+Finished loading point cloud
+Loading point cloud of subject0282
+Finished loading point cloud
+Loading point cloud of subject0283
+Finished loading point cloud
+Loading point cloud of subject0284
+Finished loading point cloud
+Loading point cloud of subject0285
+Finished loading point cloud
+Loading point cloud of subject0286
+Finished loading point cloud
+Loading point cloud of subject0287
+Finished loading point cloud
+Loading point cloud of subject0288
+Finished loading point cloud
+Loading point cloud of subject0289
+Finished loading point cloud
+Loading point cloud of subject0290
+Finished loading point cloud
+Loading point cloud of subject0291
+Finished loading point cloud
+Loading point cloud of subject0292
+Finished loading point cloud
+Loading point cloud of subject0293
+Finished loading point cloud
+Loading point cloud of subject0294
+Finished loading point cloud
+Loading point cloud of subject0295
+Finished loading point cloud
+Loading point cloud of subject0296
+Finished loading point cloud
+Loading point cloud of subject0297
+Finished loading point cloud
+Loading point cloud of subject0298
+Finished loading point cloud
+Loading point cloud of subject0299
+Finished loading point cloud
+Loading point cloud of subject0300
+Finished loading point cloud
+Loading point cloud of subject0301
+Finished loading point cloud
+Loading point cloud of subject0302
+Finished loading point cloud
+Loading point cloud of subject0303
+Finished loading point cloud
+Loading point cloud of subject0304
+Finished loading point cloud
+Loading point cloud of subject0305
+Finished loading point cloud
+Loading point cloud of subject0306
+Finished loading point cloud
+Loading point cloud of subject0307
+Finished loading point cloud
+Loading point cloud of subject0308
+Finished loading point cloud
+Loading point cloud of subject0309
+Finished loading point cloud
+Loading point cloud of subject0310
+Finished loading point cloud
+Loading point cloud of subject0311
+Finished loading point cloud
+Loading point cloud of subject0312
+Finished loading point cloud
+Loading point cloud of subject0313
+Finished loading point cloud
+Loading point cloud of subject0314
+Finished loading point cloud
+Loading point cloud of subject0315
+Finished loading point cloud
+Loading point cloud of subject0316
+Finished loading point cloud
+Loading point cloud of subject0317
+Finished loading point cloud
+Loading point cloud of subject0318
+Finished loading point cloud
+Loading point cloud of subject0319
+Finished loading point cloud
+Loading point cloud of subject0320
+Finished loading point cloud
+Loading point cloud of subject0321
+Finished loading point cloud
+Loading point cloud of subject0322
+Finished loading point cloud
+Loading point cloud of subject0323
+Finished loading point cloud
+Loading point cloud of subject0324
+Finished loading point cloud
+Loading point cloud of subject0325
+Finished loading point cloud
+Loading point cloud of subject0326
+Finished loading point cloud
+Loading point cloud of subject0327
+Finished loading point cloud
+Loading point cloud of subject0328
+Finished loading point cloud
+Loading point cloud of subject0329
+Finished loading point cloud
+Loading point cloud of subject0330
+Finished loading point cloud
+Loading point cloud of subject0331
+Finished loading point cloud
+Loading point cloud of subject0332
+Finished loading point cloud
+Loading point cloud of subject0333
+Finished loading point cloud
+Loading point cloud of subject0334
+Finished loading point cloud
+Loading point cloud of subject0335
+Finished loading point cloud
+Loading point cloud of subject0336
+Finished loading point cloud
+Loading point cloud of subject0337
+Finished loading point cloud
+Loading point cloud of subject0338
+Finished loading point cloud
+Loading point cloud of subject0339
+Finished loading point cloud
+Loading point cloud of subject0340
+Finished loading point cloud
+Loading point cloud of subject0341
+Finished loading point cloud
+Loading point cloud of subject0342
+Finished loading point cloud
+Loading point cloud of subject0343
+Finished loading point cloud
+Loading point cloud of subject0344
+Finished loading point cloud
+Loading point cloud of subject0345
+Finished loading point cloud
+Loading point cloud of subject0346
+Finished loading point cloud
+Loading point cloud of subject0347
+Finished loading point cloud
+Loading point cloud of subject0348
+Finished loading point cloud
+Loading point cloud of subject0349
+Finished loading point cloud
+Loading point cloud of subject0350
+Finished loading point cloud
+Loading point cloud of subject0351
+Finished loading point cloud
+Loading point cloud of subject0352
+Finished loading point cloud
+Loading point cloud of subject0353
+Finished loading point cloud
+Loading point cloud of subject0354
+Finished loading point cloud
+Loading point cloud of subject0355
+Finished loading point cloud
+Loading point cloud of subject0356
+Finished loading point cloud
+Loading point cloud of subject0357
+Finished loading point cloud
+Loading point cloud of subject0358
+Finished loading point cloud
+Loading point cloud of subject0359
+Finished loading point cloud
+Loading point cloud of subject0360
+Finished loading point cloud
+Loading point cloud of subject0361
+Finished loading point cloud
+Loading point cloud of subject0362
+Finished loading point cloud
+Loading point cloud of subject0363
+Finished loading point cloud
+Loading point cloud of subject0364
+Finished loading point cloud
+Loading point cloud of subject0365
+Finished loading point cloud
+Loading point cloud of subject0366
+Finished loading point cloud
+Loading point cloud of subject0367
+Finished loading point cloud
+Loading point cloud of subject0368
+Finished loading point cloud
+Loading point cloud of subject0369
+Finished loading point cloud
+Loading point cloud of subject0370
+Finished loading point cloud
+Loading point cloud of subject0371
+Finished loading point cloud
+Loading point cloud of subject0372
+Finished loading point cloud
+Loading point cloud of subject0373
+Finished loading point cloud
+Loading point cloud of subject0374
+Finished loading point cloud
+Loading point cloud of subject0375
+Finished loading point cloud
+Loading point cloud of subject0376
+Finished loading point cloud
+Loading point cloud of subject0377
+Finished loading point cloud
+Loading point cloud of subject0378
+Finished loading point cloud
+Loading point cloud of subject0379
+Finished loading point cloud
+Loading point cloud of subject0380
+Finished loading point cloud
+Loading point cloud of subject0381
+Finished loading point cloud
+Loading point cloud of subject0382
+Finished loading point cloud
+Loading point cloud of subject0383
+Finished loading point cloud
+Loading point cloud of subject0384
+Finished loading point cloud
+Loading point cloud of subject0385
+Finished loading point cloud
+Loading point cloud of subject0386
+Finished loading point cloud
+Loading point cloud of subject0387
+Finished loading point cloud
+Loading point cloud of subject0388
+Finished loading point cloud
+Loading point cloud of subject0389
+Finished loading point cloud
+Loading point cloud of subject0390
+Finished loading point cloud
+Loading point cloud of subject0391
+Finished loading point cloud
+Loading point cloud of subject0392
+Finished loading point cloud
+Loading point cloud of subject0393
+Finished loading point cloud
+Loading point cloud of subject0394
+Finished loading point cloud
+Loading point cloud of subject0395
+Finished loading point cloud
+Loading point cloud of subject0396
+Finished loading point cloud
+Loading point cloud of subject0397
+Finished loading point cloud
+Loading point cloud of subject0398
+Finished loading point cloud
+Loading point cloud of subject0399
+Finished loading point cloud
+Loading point cloud of subject0400
+Finished loading point cloud
+Loading point cloud of subject0401
+Finished loading point cloud
+Loading point cloud of subject0402
+Finished loading point cloud
+Loading point cloud of subject0403
+Finished loading point cloud
+Loading point cloud of subject0404
+Finished loading point cloud
+Loading point cloud of subject0405
+Finished loading point cloud
+Loading point cloud of subject0406
+Finished loading point cloud
+Loading point cloud of subject0407
+Finished loading point cloud
+Loading point cloud of subject0408
+Finished loading point cloud
+Loading point cloud of subject0409
+Finished loading point cloud
+Loading point cloud of subject0410
+Finished loading point cloud
+Loading point cloud of subject0411
+Finished loading point cloud
+Loading point cloud of subject0412
+Finished loading point cloud
+Loading point cloud of subject0413
+Finished loading point cloud
+Loading point cloud of subject0414
+Finished loading point cloud
+Loading point cloud of subject0415
+Finished loading point cloud
+Loading point cloud of subject0416
+Finished loading point cloud
+Loading point cloud of subject0417
+Finished loading point cloud
+Loading point cloud of subject0418
+Finished loading point cloud
+train pts: 180000 | val pts: 20000 | val items: 1676 | val batches: 104
+419
+SingleBVPNet(
+  (net): FCBlock(
+    (net): MetaSequential(
+      (0): MetaSequential(
+        (0): BatchLinear(in_features=4, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (1): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (2): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (3): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (4): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+    )
+  )
+)
+SingleBVPNet(
+  (net): FCBlock(
+    (net): MetaSequential(
+      (0): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (1): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (2): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (3): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=3, bias=True)
+      )
+    )
+  )
+)
+SDFBVPNet(
+  (net): FCBlock(
+    (net): MetaSequential(
+      (0): MetaSequential(
+        (0): BatchLinear(in_features=3, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (1): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (2): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (3): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (4): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=128, bias=True)
+        (1): Sine()
+      )
+      (5): MetaSequential(
+        (0): BatchLinear(in_features=128, out_features=1, bias=True)
+      )
+    )
+  )
+)
+Training Info:
+num_instances:		 419
+batch_size:		 16
+epochs:			 500
+learning rate:		 0.0001
+====================================================================================================
+EPOCH 0 DONE | steps 1964 | mean total loss 193.264730 | sum total loss 379571.929 | epoch time 129.5s
+EPOCH 0 MEAN COMPONENTS | sdf_constraint_stage1 26.144 sdf_constraint_stage2 23.617 reconstructed_loss 64.386 inter 3.887 normal_constraint 35.205 grad_constraint 18.142 embeddings_constraint 21.816 template_reg 0.066 similarity_constraint 0.002
+VALIDATION EPOCH 0 | steps 104 | mean total loss 93.255231
+VALIDATION EPOCH 0 MEAN COMPONENTS | sdf_constraint_stage1 19.120 sdf_constraint_stage2 18.318 reconstructed_loss 3.244 inter 3.103 normal_constraint 30.317 grad_constraint 15.116 embeddings_constraint 4.038 template_reg 0.000 similarity_constraint 0.000
+====================================================================================================
+====================================================================================================
+EPOCH 1 DONE | steps 1964 | mean total loss 87.771753 | sum total loss 172383.722 | epoch time 129.3s
+EPOCH 1 MEAN COMPONENTS | sdf_constraint_stage1 17.817 sdf_constraint_stage2 17.912 reconstructed_loss 3.472 inter 2.632 normal_constraint 27.612 grad_constraint 14.551 embeddings_constraint 3.775 template_reg 0.000 similarity_constraint 0.000
+VALIDATION EPOCH 1 | steps 104 | mean total loss 81.695950
+VALIDATION EPOCH 1 MEAN COMPONENTS | sdf_constraint_stage1 16.951 sdf_constraint_stage2 17.071 reconstructed_loss 2.508 inter 2.041 normal_constraint 25.404 grad_constraint 13.993 embeddings_constraint 3.726 template_reg 0.000 similarity_constraint 0.000
+====================================================================================================
+====================================================================================================
+EPOCH 2 DONE | steps 1964 | mean total loss 77.642320 | sum total loss 152489.516 | epoch time 129.5s
+EPOCH 2 MEAN COMPONENTS | sdf_constraint_stage1 15.843 sdf_constraint_stage2 16.206 reconstructed_loss 2.712 inter 2.003 normal_constraint 23.585 grad_constraint 13.592 embeddings_constraint 3.700 template_reg 0.000 similarity_constraint 0.000
+VALIDATION EPOCH 2 | steps 104 | mean total loss 75.535374
+VALIDATION EPOCH 2 MEAN COMPONENTS | sdf_constraint_stage1 15.666 sdf_constraint_stage2 15.909 reconstructed_loss 3.036 inter 2.119 normal_constraint 21.895 grad_constraint 13.239 embeddings_constraint 3.671 template_reg 0.000 similarity_constraint 0.000
+====================================================================================================
+====================================================================================================
+EPOCH 3 DONE | steps 1964 | mean total loss 70.105307 | sum total loss 137686.823 | epoch time 129.5s
+EPOCH 3 MEAN COMPONENTS | sdf_constraint_stage1 14.496 sdf_constraint_stage2 14.818 reconstructed_loss 2.133 inter 1.599 normal_constraint 20.500 grad_constraint 12.917 embeddings_constraint 3.641 template_reg 0.000 similarity_constraint 0.000

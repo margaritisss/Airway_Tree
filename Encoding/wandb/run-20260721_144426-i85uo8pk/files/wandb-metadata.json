@@ -1,0 +1,23 @@
+{
+  "os": "Linux-6.12.0-211.7.3.el10_2.x86_64-x86_64-with-glibc2.39",
+  "python": "CPython 3.11.13",
+  "startedAt": "2026-07-21T12:44:26.304707Z",
+  "args": [
+    "--log",
+    "/home/ids/gmargari-24/airway_project/Data/vae_runs/new_256_L32/train.log",
+    "--metrics",
+    "/home/ids/gmargari-24/airway_project/Data/vae_runs/new_256_L32/metrics.jsonl",
+    "--project",
+    "airway-bvae",
+    "--name",
+    "new_256_L32_full"
+  ],
+  "program": "/home/ids/gmargari-24/airway_project/Encoding/replot_three_charts.py",
+  "codePath": "replot_three_charts.py",
+  "codePathLocal": "replot_three_charts.py",
+  "email": "georgios.margaritis@ip-paris.fr",
+  "root": "/home/ids/gmargari-24/airway_project/Encoding",
+  "host": "nodecpu01",
+  "executable": "/home/ids/gmargari-24/airway_project/new_3env/bin/python",
+  "writerId": "41dlhabjf8k7pigjbzb6ew669ehadpeb"
+}

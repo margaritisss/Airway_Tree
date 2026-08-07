@@ -12,8 +12,8 @@ import math
 def _conv_block(in_ch: int, out_ch: int, stride: int, padding: int, kernel_size: int = 3) -> nn.Sequential:
     """Conv3d -> BatchNorm3d -> ELU."""
     return nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=kernel_size, stride=stride, padding=padding, bias=False),
-           nn.BatchNorm3d(out_ch),  
-           nn.ELU(inplace=True),) 
+                         nn.BatchNorm3d(out_ch),  
+                         nn.ELU(inplace=True),) 
 
 
 def _deconv_block(in_ch: int, out_ch: int, kernel_size: int = 3, stride: int = 1, padding: int = 1, output_padding: int = 0, activation: bool = True) -> nn.Sequential:
@@ -29,7 +29,7 @@ def _deconv_block(in_ch: int, out_ch: int, kernel_size: int = 3, stride: int = 1
 # Model
 # ---------------------------------------------------------------------------
 
-class VoxelVAE128(nn.Module):
+class VoxelVAE256(nn.Module):
     """
     Voxel VAE on 128x128x128 occupancy grids. Encoder: 128 -> 64 -> 32 -> 16 -> 8 -> 4 with channels 16/32/64/128/128.
     """
@@ -64,7 +64,7 @@ class VoxelVAE128(nn.Module):
         self.enc10 = _conv_block(c9, c10, kernel_size=3, stride=2, padding=1)         # 13 -> 7    | Ch: c9 -> c10
 
 
-        flat_dim = c8 * 7 * 7 * 7   # Bottleneck shape is 2048 * 7 * 7 * 7 = 702,464
+        flat_dim = c10 * 7 * 7 * 7   # Bottleneck shape is 2048 * 7 * 7 * 7 = 702,464
 
         self.enc_fc = nn.Sequential(       # Fully connected layer to map from flattened conv output to latent space, dimensions: 351,232 -> 343
                       nn.Linear(flat_dim, fc_dim, bias=False),
@@ -114,7 +114,6 @@ class VoxelVAE128(nn.Module):
         logsigma = self.enc_logsigma(h).clamp(-10.0, 10.0)
         return mu, logsigma
 
-
     def reparameterize(self, mu, logsigma):
         if self.training:
             return mu + torch.exp(logsigma) * torch.randn_like(mu)
@@ -135,7 +134,6 @@ class VoxelVAE128(nn.Module):
         h = self.dec10(h)
         logits = self.dec11(h)
         return logits
-
 
     def forward(self, x):
         mu, logsigma = self.encode(x)
