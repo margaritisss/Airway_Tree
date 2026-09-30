@@ -24,6 +24,40 @@ from sklearn.manifold import TSNE
 import plotly.express as px
 import plotly.graph_objects as go
 
+def load_embeddings(path):                              # accepts .npy, .npz or .pth
+    """Return (mu, paths). paths is synthetic when the file carries no ids."""
+    path = str(path)                                    # tolerate Path objects
+
+    if path.endswith(".pth"):                           # DeepSDF LatentCodes checkpoint
+        import torch                                    # only this branch needs it
+        blob = torch.load(path, map_location="cpu")     # never touch the GPU here
+        if isinstance(blob, dict) and "latent_codes" in blob:
+            codes = blob["latent_codes"]                # DeepSDF wraps them with the epoch
+        else:
+            codes = blob                                # some forks save the bare object
+        if not isinstance(codes, torch.Tensor):
+            codes = codes["weight"]                     # nn.Embedding state_dict -> (N, D)
+        mu = codes.detach().cpu().numpy().astype(np.float32)
+        paths = None                                    # the checkpoint stores no filenames
+    else:
+        raw = np.load(path, allow_pickle=True)          # .npz -> NpzFile, .npy -> ndarray
+        if isinstance(raw, np.ndarray):                 # bare .npy: the array *is* mu
+            mu = np.asarray(raw, dtype=np.float32)
+            paths = None
+        else:                                           # .npz archive: pull named arrays
+            mu = np.asarray(raw["mu"], dtype=np.float32)
+            paths = raw["paths"] if "paths" in raw else None
+
+    if mu.ndim == 3 and mu.shape[1] == 1:               # DeepSDF layout is (N, 1, D)
+        mu = mu[:, 0, :]                                # drop the singleton axis
+
+    if mu.ndim != 2:                                    # (N, D) is required downstream
+        raise ValueError(f"Expected mu of shape (N, D), got {mu.shape}")
+
+    if paths is None:                                   # placeholders keep hover labels working
+        paths = np.array([f"sample_{i}" for i in range(mu.shape[0])])
+
+    return mu, paths
 
 def _infer_source(paths: np.ndarray) -> np.ndarray:
     """
@@ -43,11 +77,10 @@ def _infer_source(paths: np.ndarray) -> np.ndarray:
             labels.append(Path(s).parent.name or "unknown")
     return np.array(labels)
 
-
 def tsne_visualize(
     npz_path: str | Path,
     *, # 
-    perplexity: float = 15.0,
+    perplexity: float = 20.0,
     active_var_frac: float = 0.05,
     standardize: bool = True,
     color_by: np.ndarray | None = None,
@@ -80,18 +113,10 @@ def tsne_visualize(
         coords_2d (N,2), coords_3d (N,3), color (N,), paths (N,),
         active_dims (list[int]), fig_2d, fig_3d
     """
-    npz_path = Path(npz_path)
-    data = np.load(npz_path, allow_pickle=True)
-
-    mu = np.asarray(data["mu"], dtype=np.float32)
-    if mu.ndim != 2:
-        raise ValueError(f"Expected mu of shape (N, D), got {mu.shape}")
+    npz_path = Path(npz_path)                                   # accepts .npy too despite the name
+    mu, paths = load_embeddings(npz_path)                        # helper does the shape check
     n_samples, n_dims = mu.shape
     print(f"[info] loaded mu: {n_samples} samples x {n_dims} latent dims")
-
-    paths = data["paths"] if "paths" in data else np.array(
-        [f"sample_{i}" for i in range(n_samples)]
-    )
 
     # ---- active-dim filtering (posterior collapse check) ----
     var = mu.var(axis=0)

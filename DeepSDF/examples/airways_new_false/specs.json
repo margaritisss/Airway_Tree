@@ -1,0 +1,95 @@
+{
+  "Description": "DeepSDF on pulmonary airway trees, trained with the DGCI SDF loss (no beta).",
+  "DataSource": "/home/ids/gmargari-24/airway_project/Data/data_unregistered_2m",
+  "TrainSplit": "examples/splits/airways_train.json",
+  "TestSplit": "examples/splits/airways_test.json",
+  "NetworkArch": "deep_sdf_decoder",
+  "NetworkSpecs": {
+    "dims": [
+      512,
+      512,
+      512,
+      512,
+      512,
+      512,
+      512,
+      512
+    ],
+    "dropout": [],
+    "dropout_prob": 0.0,
+    "norm_layers": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "latent_in": [
+      4
+    ],
+    "xyz_in_all": false,
+    "use_tanh": false,
+    "latent_dropout": false,
+    "weight_norm": true,
+    "final_tanh": false,
+    "activation": "softplus",
+    "add_xyz_norm": false,
+    "geometric_init": true,
+    "geometric_init_radius": 0.5
+  },
+  "CodeLength": 256,
+  "NumEpochs": 20001,
+  "SnapshotFrequency": 500,
+  "AdditionalSnapshots": [
+    100,
+    250
+  ],
+  "LearningRateSchedule": [
+    {
+      "Type": "Step",
+      "Initial": 0.001,
+      "Interval": 4000,
+      "Factor": 0.5
+    },
+    {
+      "Type": "Step",
+      "Initial": 0.002,
+      "Interval": 4000,
+      "Factor": 0.5
+    }
+  ],
+  "SamplesPerScene": 16384,
+  "ScenesPerBatch": 64,
+  "DataLoaderThreads": 4,
+  "ClampingDistance": 0.1,
+  "LoadRam": false,
+  "CodeRegularization": true,
+  "CodeRegularizationLambda": 0.3,
+  "CodeBound": 1.0,
+  "DGCILoss": {
+    "SurfaceSamplesPerScene": 4096,
+    "FreeSamplesPerScene": 4096,
+    "UniformSamplesPerScene": 2048,
+    "Weights": {
+      "sdf": 3000.0,
+      "phi": 500.0,
+      "normal": 100.0,
+      "eikonal": 50.0
+    },
+    "PhiDelta": 100.0,
+    "PhiOn": "uniform",
+    "L1ClampingDistance": null
+  },
+  "TrackSubjects": "auto",
+  "TrackFrequency": 10,
+  "TrackOutput": "mask",
+  "TrackNormDir": "/home/ids/gmargari-24/airway_project/Data/data_unregistered_2m",
+  "TrackNormSuffix": "_norm.npz",
+  "TrackReferenceDir": "/projects/AirTwin_angelini/work_dataset/dataset/AIIB23/gt,/projects/AirTwin_angelini/work_dataset/dataset/ATM22/labelsTr",
+  "TrackWorld": "ras",
+  "TrackSupersample": 1,
+  "TrackOccupancy": 0.5
+}

@@ -1304,3 +1304,4 @@ def isotropic_center_pad(input_folders,
                 print(f"[{index}/{len(nii_files)}] Error processing '{filename}': {e}")
                 
         print(f"\nFinished! Successfully processed {successful} of {len(nii_files)} files in {folder_name}.")
+

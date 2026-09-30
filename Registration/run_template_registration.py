@@ -1,13 +1,13 @@
-from airway_project.Registration.groupwise_registration_2_fld import register_groupwise_deformable
+from Registration.groupwise_registration_2_fld import register_groupwise_deformable
 
 if __name__ == '__main__': 
     
     register_groupwise_deformable(
-    input_folder_a      = "/home/ids/gmargari-24/Data/Affine_registered_ATM22",
-    input_folder_b      = None,
-    choose              = 24,
-    output_folder       = "/home/ids/gmargari-24/Data/Template",
-    groupwise_iters     = 4,
+    input_folder_a      = "/projects/AirTwin_angelini/work_dataset/dataset/ATM22/labelsTr",
+    input_folder_b      = "/projects/AirTwin_angelini/work_dataset/dataset/AIIB23/gt",
+    choose              = 4,
+    output_folder       = "/home/ids/gmargari-24/Data/4_8",
+    groupwise_iters     = 8,
     gradient_step       = 0.2,
     blending_weight     = 0.75,
     verbose             = False,

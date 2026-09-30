@@ -162,7 +162,7 @@ def _register_one(args):
     reg = ants.registration(
         fixed=template,
         moving=img,
-        type_of_transform='SyNOnly',
+        type_of_transform='SyNOnly', # 
         verbose=verbose,
     )
     t_regdone = time.monotonic()
@@ -314,15 +314,24 @@ def register_groupwise_deformable(
             os.environ['ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS'] = str(template_threads)
             os.environ['OMP_NUM_THREADS'] = str(template_threads)
 
+            step_dir = "/home/ids/gmargari-24/airway_project/Data/Templates/step_by_step"  # folder for per-iteration templates
+            os.makedirs(step_dir, exist_ok=True)  # create it if it doesn't exist
+
             with stage(f"4: build template ({groupwise_iters} iters, "
                        f"{template_threads} threads)"):
-                template = ants.build_template(
-                    image_list=images,
-                    iterations=groupwise_iters,
-                    gradient_step=gradient_step,
-                    blending_weight=blending_weight,
-                    type_of_transform='SyN',
-                )
+                template = None  # first call builds the initial average itself
+                for it in range(1, groupwise_iters + 1):  # one call per iteration
+                    template = ants.build_template(
+                        initial_template=template,  # continue from previous iteration's template
+                        image_list=images,
+                        iterations=1,  # exactly one groupwise iteration per call
+                        gradient_step=gradient_step,
+                        blending_weight=blending_weight,
+                        type_of_transform='SyN',
+                    )
+                    out = os.path.join(step_dir, f"{it}.nii.gz")  # 1.nii.gz, 2.nii.gz, ...
+                    ants.image_write(template, out)  # save this iteration's template
+                    log(f"  iteration {it}/{groupwise_iters} saved to {out}")  # progress line in .out
             del images
 
             # Reset parent env so children inherit the right value even if _init_worker

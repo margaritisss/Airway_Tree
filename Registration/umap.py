@@ -1,27 +1,26 @@
 import numpy as np
 import umap
+import matplotlib                                       # before pyplot so the backend sticks
+matplotlib.use("Agg")                                   # render to file, no display on the cluster
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 import hdbscan
 from sklearn.metrics import silhouette_score
 
-
-def apply_umap(embeddings_path: str, output_image: str = "umap_projection.png"):
+def apply_umap(embeddings_path: str, output_image: str = "umap_projection.png",
+               n_neighbors: int = 20, min_dist: float = 0.0125):
     # 1. Load the data
     print(f"Loading embeddings from {embeddings_path}...")
-    data = np.load(embeddings_path)
-    mu = data['mu']         # The N x 100 feature matrix
-    paths = data['paths']   # Array of file paths to map back to patients
-    
+    mu, paths = load_embeddings(embeddings_path)
     print(f"Loaded {mu.shape[0]} airway models of dimension {mu.shape[1]}")
 
     # 2. Configure and apply UMAP
     # Note: UMAP is highly sensitive to n_neighbors and min_dist. 
     print("Fitting UMAP manifold... (this might take a moment)")
     reducer = umap.UMAP(
-        n_neighbors = 15,    # Balances local vs global structure, n_neig
-        min_dist    = 0.0125,   # Controls cluster tightness
+        n_neighbors = n_neighbors,    # Balances local vs global structure, n_neig
+        min_dist    = min_dist,   # Controls cluster tightness
         n_components= 2,     # Target dimensions (2D for plotting)
         metric      = 'euclidean',  # Standard for VAE latent spaces
         random_state=42      # Fix the seed for reproducibility
@@ -55,14 +54,47 @@ def apply_umap(embeddings_path: str, output_image: str = "umap_projection.png"):
     return embedding_2d, paths
 
 
+def load_embeddings(path):                              # accepts .npy, .npz or .pth
+    """Return (mu, paths). paths is synthetic when the file carries no ids."""
+    path = str(path)                                    # tolerate Path objects
 
+    if path.endswith(".pth"):                           # DeepSDF LatentCodes checkpoint
+        import torch                                    # only this branch needs it
+        blob = torch.load(path, map_location="cpu")     # never touch the GPU here
+        if isinstance(blob, dict) and "latent_codes" in blob:
+            codes = blob["latent_codes"]                # DeepSDF wraps them with the epoch
+        else:
+            codes = blob                                # some forks save the bare object
+        if not isinstance(codes, torch.Tensor):
+            codes = codes["weight"]                     # nn.Embedding state_dict -> (N, D)
+        mu = codes.detach().cpu().numpy().astype(np.float32)
+        paths = None                                    # the checkpoint stores no filenames
+    else:
+        raw = np.load(path, allow_pickle=True)          # .npz -> NpzFile, .npy -> ndarray
+        if isinstance(raw, np.ndarray):                 # bare .npy: the array *is* mu
+            mu = np.asarray(raw, dtype=np.float32)
+            paths = None
+        else:                                           # .npz archive: pull named arrays
+            mu = np.asarray(raw["mu"], dtype=np.float32)
+            paths = raw["paths"] if "paths" in raw else None
+
+    if mu.ndim == 3 and mu.shape[1] == 1:               # DeepSDF layout is (N, 1, D)
+        mu = mu[:, 0, :]                                # drop the singleton axis
+
+    if mu.ndim != 2:                                    # (N, D) is required downstream
+        raise ValueError(f"Expected mu of shape (N, D), got {mu.shape}")
+
+    if paths is None:                                   # placeholders keep hover labels working
+        paths = np.array([f"sample_{i}" for i in range(mu.shape[0])])
+
+    return mu, paths
 
 def apply_hdbscan(embedding_2d, output_image="hdbscan_clusters.png"):
     print("Fitting HDBSCAN clustering model...")
 
     # 1. Configure and apply HDBSCAN
     clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=7,      # Minimum points required to form a cluster
+        min_cluster_size=4,      # Minimum points required to form a cluster
         min_samples=2,           # Controls how conservative the clustering is
         gen_min_span_tree=True,  # Required for relative_validity_ (DBCV)
     )
@@ -180,9 +212,7 @@ def sweep_umap_hdbscan(
     results_csv="sweep_results.csv",
 ):
     # 1. Load data once
-    data = np.load(embeddings_path)
-    mu = data['mu']
-    paths = data['paths']
+    mu, _ = load_embeddings(embeddings_path)
     n_samples = mu.shape[0]
     print(f"Loaded {n_samples} models of dimension {mu.shape[1]}")
 
