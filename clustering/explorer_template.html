@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {                                            /* light tokens */
+  --bg: #eceef7; --panel: #ffffff; --raise: #f3f4fa; --line: #d6d9ea;
+  --text: #1b1f3b; --muted: #585d85; --accent: #4f46c8; --accent-ink: #ffffff;
+  --plot: #ffffff; --grid: #e1e4f0; --axisbox: #f6f7fc;
+  --font: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {                /* dark tokens, system preference */
+    --bg: #0f1329; --panel: #171c38; --raise: #20264a; --line: #2d345f;
+    --text: #e8eaf6; --muted: #9ba1c9; --accent: #a09dff; --accent-ink: #12162e;
+    --plot: #12162e; --grid: #2a3159; --axisbox: #161b37;
+  }
+}
+:root[data-theme="dark"] {                         /* dark tokens, forced */
+  --bg: #0f1329; --panel: #171c38; --raise: #20264a; --line: #2d345f;
+  --text: #e8eaf6; --muted: #9ba1c9; --accent: #a09dff; --accent-ink: #12162e;
+  --plot: #12162e; --grid: #2a3159; --axisbox: #161b37;
+}
+* { box-sizing: border-box; }                      /* sizes include padding */
+[hidden] { display: none !important; }             /* hidden wins over flex/grid */
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 15px/1.45 var(--font); }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height: 100dvh; }
+
+.bar { background: var(--panel); border-bottom: 1px solid var(--line); padding: 0.6rem 1.1rem;
+       display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; align-items: center; }
+.bar h1 { margin: 0; font-size: 1.05rem; line-height: 1.2; }
+.bar h1 small { display: block; font-size: 0.78rem; font-weight: 400; color: var(--muted); }
+.spacer { flex: 1; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.tabs button { background: none; border: 1px solid transparent; border-radius: 999px;
+               padding: 0.35rem 0.9rem; cursor: pointer; }
+.tabs button:hover { background: var(--raise); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.tabs.sub button { border-radius: 6px; padding: 0.28rem 0.7rem; font-size: 0.92rem; }
+.tabs.sub button[aria-selected="true"] { background: var(--raise); color: var(--text);
+                                         border-color: var(--accent); }
+
+.field { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); }
+.field select, .tool select { background: var(--raise); border: 1px solid var(--line);
+       border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.9rem; color: var(--text); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button, .btn { background: var(--raise); border: 0; padding: 0.3rem 0.7rem; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.btn { border: 1px solid var(--line); border-radius: 6px; }
+.btn:hover, .seg button:hover { filter: brightness(1.08); }
+
+.stage { position: relative; min-height: 0; background: var(--plot); }
+#plot { position: absolute; inset: 0; }
+.nodata { position: absolute; inset: 0; display: grid; place-content: center; color: var(--muted);
+          text-align: center; padding: 2rem; }
+
+.tools { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; padding: 0.55rem 1.1rem;
+         border-top: 1px solid var(--line); background: var(--panel); font-size: 0.85rem; }
+.tool { display: flex; align-items: center; gap: 0.35rem; }
+.tool > span { color: var(--muted); }
+.tool input[type="range"] { width: 6.5rem; accent-color: var(--accent); }
+
+.help { position: absolute; right: 1rem; bottom: 1rem; width: min(22rem, calc(100% - 2rem));
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 0.9rem 1rem; font-size: 0.86rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+.help h3 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+.help dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.8rem; margin: 0; }
+.help dt { font-weight: 700; white-space: nowrap; }
+.help dd { margin: 0; color: var(--muted); }
+kbd { font: inherit; font-size: 0.8rem; border: 1px solid var(--line); border-bottom-width: 2px;
+      border-radius: 4px; padding: 0 0.3rem; background: var(--raise); }
+.toast { position: fixed; left: 50%; bottom: 4.5rem; transform: translateX(-50%); background: var(--text);
+         color: var(--bg); padding: 0.45rem 0.9rem; border-radius: 6px; font-size: 0.88rem; opacity: 0;
+         pointer-events: none; transition: opacity 0.2s; }
+.toast.show { opacity: 1; }
+
+.tabs .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0.15rem 0.4rem; }
+
+.stats { position: absolute; inset: 0; overflow: auto; padding: 1rem 1.1rem 1.5rem; background: var(--plot); }
+.stats .note { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.8rem; }
+.stats .note .chip { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 3px;
+                     vertical-align: -0.15rem; margin: 0 0.2rem; }
+.stats .wrap { overflow-x: auto; }                  /* wide table scrolls inside itself */
+.stats table { border-collapse: separate; border-spacing: 0; font-size: 0.86rem; min-width: 100%; }
+.stats th, .stats td { border-bottom: 1px solid var(--line); padding: 0.5rem 0.75rem; text-align: right;
+                       vertical-align: top; white-space: nowrap; }
+.stats thead th { position: sticky; top: -1rem; background: var(--panel); z-index: 1; font-weight: 700; }
+.stats thead th .dot { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%;
+                       margin-right: 0.35rem; vertical-align: -0.05rem; }
+.stats th.metric, .stats td.metric { text-align: left; position: sticky; left: 0; background: var(--panel);
+                                     font-weight: 700; }
+.stats thead th.metric { z-index: 2; }
+.stats td .mean { font-size: 1rem; font-weight: 700; color: var(--text); }
+.stats td .sub { display: block; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+.stats td.all { border-left: 2px solid var(--line); }
+.stats tr.count td { font-weight: 700; }
+
+.focus .bar.second, .focus .bar.first h1 { display: none; }   /* focus mode keeps only the method tabs */
+
+@media (max-width: 760px) {                        /* phones: let the page scroll */
+  .app { height: auto; grid-template-rows: auto auto 70vh auto; }
+  .bar { padding: 0.5rem 0.7rem; }
+  .tools { padding: 0.5rem 0.7rem; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar first">
+    <h1 id="app-title">__TITLE__<small id="app-sub"></small></h1>
+    <nav class="tabs" id="methods" role="tablist" aria-label="Clustering method"></nav>
+  </header>
+
+  <div class="bar second">
+    <nav class="tabs sub" id="projections" role="tablist" aria-label="Projection"></nav>
+    <span class="spacer"></span>
+    <div class="field projonly">Mode
+      <div class="seg" id="dims">
+        <button data-dim="2D" aria-pressed="false">2D</button>
+        <button data-dim="3D" aria-pressed="true">3D</button>
+      </div>
+    </div>
+    <label class="field projonly" id="setting-field" hidden><span id="setting-label">Setting</span><select id="setting"></select></label>
+    <label class="field projonly">Colour by<select id="colour"></select></label>
+    <label class="field boxonly" hidden>Metric<select id="box-metric"></select></label>
+    <label class="field boxonly" hidden><input type="checkbox" id="box-points" checked> Show subjects</label>
+    <label class="field statsonly" hidden><input type="checkbox" id="stats-tint" checked> Tint by difference</label>
+    <button class="btn statsonly" id="stats-csv" hidden>Download CSV</button>
+  </div>
+
+  <div class="stage">
+    <div id="plot"></div>
+    <div class="stats" id="stats" hidden></div>
+    <div class="nodata" id="nodata" hidden>This file has no data yet. Build it with build_explorer.py.</div>
+    <div class="help" id="help" hidden>
+      <h3>Controls</h3>
+      <dl>
+        <dt>Left drag</dt><dd>Rotate (3D) or zoom box (2D)</dd>
+        <dt>Right drag</dt><dd>Pan</dd>
+        <dt>Scroll</dt><dd>Zoom</dd>
+        <dt><kbd>1</kbd> <kbd>3</kbd> <kbd>7</kbd></dt><dd>Front, right, top view (add <kbd>Alt</kbd> for the opposite side)</dd>
+        <dt><kbd>4</kbd> <kbd>6</kbd> <kbd>8</kbd> <kbd>2</kbd></dt><dd>Orbit 15° left, right, up, down</dd>
+        <dt><kbd>D</kbd></dt><dd>Switch 2D and 3D</dd>
+        <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Previous or next hyper-parameter setting</dd>
+        <dt><kbd>R</kbd></dt><dd>Auto-rotate on or off</dd>
+        <dt><kbd>Home</kbd></dt><dd>Reset the view</dd>
+        <dt><kbd>F</kbd></dt><dd>Focus mode, hides the header</dd>
+        <dt><kbd>PgUp</kbd> <kbd>PgDn</kbd></dt><dd>Previous or next tab (projections, Stats, Box plots)</dd>
+      </dl>
+    </div>
+  </div>
+
+  <footer class="tools" id="tools">
+    <div class="tool only3d"><span>View</span>
+      <div class="seg">
+        <button data-preset="front" title="Front (1)">Front</button>
+        <button data-preset="right" title="Right (3)">Right</button>
+        <button data-preset="top" title="Top (7)">Top</button>
+        <button data-preset="iso" title="Isometric">Iso</button>
+      </div>
+    </div>
+    <label class="tool only3d"><span>Drag</span>
+      <select id="dragmode3d"><option value="turntable">Turntable</option><option value="orbit">Free orbit</option><option value="pan">Pan</option></select>
+    </label>
+    <label class="tool only3d"><input type="checkbox" id="equal"> <span>Equal axes</span></label>
+    <label class="tool only3d"><input type="checkbox" id="box" checked> <span>Axes</span></label>
+    <button class="btn only3d" id="spin" aria-pressed="false" title="Auto-rotate (R)">Auto-rotate</button>
+    <div class="tool only2d" hidden><span>Drag</span>
+      <div class="seg" id="drag2d">
+        <button data-drag="zoom" aria-pressed="true">Zoom</button>
+        <button data-drag="pan" aria-pressed="false">Pan</button>
+      </div>
+    </div>
+    <label class="tool projonly"><span>Point size</span><input type="range" id="size" min="0.4" max="3" step="0.1" value="1"></label>
+    <button class="btn projonly" id="reset" title="Reset view (Home)">Reset view</button>
+    <span class="spacer"></span>
+    <button class="btn" id="offline">Save offline copy</button>
+    <button class="btn" id="help-btn" aria-expanded="false">Controls</button>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script id="plotly-js">/*__PLOTLY_JS__*/</script>
+<script id="figures-data" type="application/json">{/*__FIGURES__*/}</script>
+<script>
+"use strict";                                                        // catch silent mistakes
+const PAGE_SOURCE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;  // untouched page, for the offline copy
+const $ = (id) => document.getElementById(id);                       // short element lookup
+const plotEl = $("plot");                                            // the Plotly container
+const DEFAULT_EYE = { x: 1.55, y: 1.55, z: 1.2 };                    // a little further out than plotly default
+
+let DATA = { title: "", subjects: [], metrics: [], methods: [] };    // filled from the data block
+try { DATA = JSON.parse($("figures-data").textContent); } catch (err) { /* template: no data yet */ }
+
+const state = {
+  method: 0, projection: 0, setting: 0, dim: "3D", colour: "clusters",   // what is on screen
+  view: "projection",                                                // "projection", "stats" or "boxplot"
+  boxMetric: "all", boxPoints: true, statsTint: true,                // stats and box plot options
+  keepLabel: "",                                                     // hyper-parameter to return to
+  cameras: {},                                                       // method+projection -> camera
+  projectionType: "perspective", dragmode3d: "turntable", drag2d: "zoom",
+  equal: false, box: true, size: 1, opacity: 1, spinning: false,     // display settings
+};
+const method = () => DATA.methods[state.method];                     // current method
+const projection = () => method().projections[state.projection];     // current projection
+const setting = () => projection().settings[Math.min(state.setting, projection().settings.length - 1)];
+const coords = () => setting().dims[state.dim];                      // [[x...], [y...], [z...]]
+const is3d = () => state.dim === "3D";                               // which toolset applies
+const cameraKey = () => `${state.method}/${projection().name}`;      // one camera per method + projection
+const settingLabel = () => setting().label;                          // e.g. "20", or "" when there is one
+const VIEWS = [{ key: "stats", name: "Stats" }, { key: "boxplot", name: "Box plots" }];  // tabs after the projections
+const onProjection = () => state.view === "projection";             // scatter plot on screen?
+
+// ---------- theme -------------------------------------------------------------------
+function tokens() {                                                  // read CSS colour tokens
+  const css = getComputedStyle(document.documentElement);
+  const get = (name) => css.getPropertyValue(name).trim();
+  return { plot: get("--plot"), text: get("--text"), muted: get("--muted"), grid: get("--grid"),
+           line: get("--line"), panel: get("--panel"), box: get("--axisbox"), font: get("--font") };
+}
+
+// ---------- trace building ----------------------------------------------------------
+function hoverAxes() {                                               // "UMAP 1=%{x:.3f}" lines
+  const names = projection().axes;                                   // axis labels of this projection
+  const parts = [`${names[0]}=%{x:.3f}`, `${names[1]}=%{y:.3f}`];
+  if (is3d()) parts.push(`${names[2]}=%{z:.3f}`);
+  return parts.join("<br>");
+}
+
+function pick(indices, axis) {                                       // one coordinate column, subset
+  const column = coords()[axis];
+  return indices.map((i) => column[i]);
+}
+
+function baseSize() {                                                // dots are smaller in 3D
+  return (is3d() ? 4 : 8) * state.size;
+}
+
+function clusterTraces() {                                           // colouring 1: the clustering
+  const m = method();
+  return m.clusters.map((cluster, ci) => {
+    const idx = [];                                                  // rows in this cluster
+    m.labels.forEach((label, i) => { if (label === ci) idx.push(i); });
+    const trace = {
+      type: is3d() ? "scatter3d" : "scatter", mode: "markers", name: cluster.name,
+      x: pick(idx, 0), y: pick(idx, 1),
+      marker: { color: cluster.color, symbol: is3d() ? cluster.symbol3d : cluster.symbol2d,
+                size: baseSize(), line: is3d() ? undefined : { width: 0.5, color: "rgba(255,255,255,0.6)" } },
+      opacity: state.opacity, hovertext: idx.map((i) => DATA.subjects[i]),
+      hovertemplate: `<b>%{hovertext}</b><br>${cluster.name}<br>${hoverAxes()}<extra></extra>`,
+    };
+    if (is3d()) trace.z = pick(idx, 2);
+    return trace;
+  });
+}
+
+function metricTraces(metric) {                                      // colourings 2 to 9: one metric
+  const m = method();
+  const t = tokens();
+  const present = [];                                                // rows with a measured value
+  const missing = [];                                                // rows without one
+  metric.values.forEach((v, i) => (v === null || Number.isNaN(v) ? missing : present).push(i));
+  present.sort((a, b) => metric.values[a] - metric.values[b]);       // high values drawn on top
+  const clusterOf = (i) => m.clusters[m.labels[i]].name;             // cluster shown on hover
+  const traces = [{
+    type: is3d() ? "scatter3d" : "scatter", mode: "markers", name: metric.name, showlegend: false,
+    x: pick(present, 0), y: pick(present, 1),
+    marker: { color: present.map((i) => metric.values[i]), colorscale: "Viridis",
+              cmin: metric.vmin, cmax: metric.vmax, size: baseSize(),
+              line: is3d() ? undefined : { width: 0.5, color: "rgba(255,255,255,0.6)" },
+              colorbar: { title: { text: metric.name, side: "right", font: { color: t.text } },
+                          thickness: 14, len: 0.7, outlinewidth: 0, tickfont: { color: t.muted } } },
+    opacity: state.opacity, hovertext: present.map((i) => DATA.subjects[i]),
+    customdata: present.map((i) => clusterOf(i)),
+    hovertemplate: `<b>%{hovertext}</b><br>%{customdata}<br>${metric.name}=%{marker.color:.4g}<br>${hoverAxes()}<extra></extra>`,
+  }];
+  if (is3d()) traces[0].z = pick(present, 2);
+  if (missing.length) {                                              // grey, so no subject disappears
+    const grey = {
+      type: is3d() ? "scatter3d" : "scatter", mode: "markers", name: "no value",
+      x: pick(missing, 0), y: pick(missing, 1),
+      marker: { color: "lightgrey", size: baseSize() }, opacity: state.opacity,
+      hovertext: missing.map((i) => DATA.subjects[i]),
+      hovertemplate: `<b>%{hovertext}</b><br>no ${metric.name} value<extra></extra>`,
+    };
+    if (is3d()) grey.z = pick(missing, 2);
+    traces.push(grey);
+  }
+  return traces;
+}
+
+function buildData() {
+  if (state.colour === "clusters") return clusterTraces();           // the clustering itself
+  const metric = DATA.metrics.find((m) => m.name === state.colour);  // one of the 8 metrics
+  return metric ? metricTraces(metric) : clusterTraces();            // fall back if it is missing
+}
+
+function axis3d(name, t) {                                           // one scene axis, themed
+  return { title: { text: name, font: { color: t.text } }, color: t.muted, gridcolor: t.grid,
+           zerolinecolor: t.line, backgroundcolor: t.box, showbackground: state.box,
+           showgrid: state.box, zeroline: false, showticklabels: state.box, showspikes: false };
+}
+
+function buildLayout() {
+  const t = tokens();
+  const names = projection().axes;                                   // axis labels of this projection
+  const layout = {
+    uirevision: cameraKey() + state.dim,                             // keeps camera and legend clicks
+    paper_bgcolor: t.plot, plot_bgcolor: t.plot,
+    font: { family: t.font, color: t.text, size: 13 },
+    hoverlabel: { bgcolor: t.panel, bordercolor: t.line, font: { color: t.text, family: t.font } },
+    showlegend: true,
+  };
+  if (is3d()) {
+    layout.margin = { l: 0, r: 0, t: 0, b: 0 };                      // the scene uses the whole stage
+    layout.legend = { x: 0.99, xanchor: "right", y: 0.92, bgcolor: "rgba(0,0,0,0)",
+                      itemsizing: "constant", font: { color: t.text } };
+    layout.scene = {
+      xaxis: axis3d(names[0], t), yaxis: axis3d(names[1], t), zaxis: axis3d(names[2], t),
+      aspectmode: state.equal ? "data" : "cube",                     // data = true proportions
+      dragmode: state.dragmode3d,
+      camera: Object.assign({ eye: DEFAULT_EYE, up: { x: 0, y: 0, z: 1 }, center: { x: 0, y: 0, z: 0 } },
+                            state.cameras[cameraKey()] || {}, { projection: { type: state.projectionType } }),
+    };
+  } else {
+    const axis = (name) => ({ title: { text: name }, color: t.muted, gridcolor: t.grid,
+                              zeroline: false, linecolor: t.line, automargin: true });
+    layout.margin = { l: 64, r: 16, t: 36, b: 56 };                  // room for titles and modebar
+    layout.legend = { x: 1.01, xanchor: "left", y: 1, bgcolor: "rgba(0,0,0,0)",
+                      itemsizing: "constant", font: { color: t.text } };
+    layout.xaxis = axis(names[0]);
+    layout.yaxis = axis(names[1]);
+    layout.dragmode = state.drag2d;
+  }
+  return layout;
+}
+
+// ---------- per-cluster statistics ----------------------------------------------------
+function quantile(sorted, q) {                                       // linear interpolation, like numpy
+  if (!sorted.length) return NaN;
+  const pos = (sorted.length - 1) * q;                               // fractional index
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+function describe(values) {                                          // n, mean, SD, variance, quartiles
+  const v = values.filter((x) => x !== null && Number.isFinite(x)).sort((a, b) => a - b);
+  const n = v.length;
+  const mean = n ? v.reduce((a, b) => a + b, 0) / n : NaN;
+  const variance = n > 1 ? v.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : NaN;  // sample variance (n-1)
+  return { n, mean, variance, sd: Math.sqrt(variance), median: quantile(v, 0.5),
+           q1: quantile(v, 0.25), q3: quantile(v, 0.75), min: n ? v[0] : NaN, max: n ? v[n - 1] : NaN };
+}
+
+function clusterValues(metric, ci) {                                 // metric values of one cluster
+  const labels = method().labels;
+  const out = [];
+  metric.values.forEach((v, i) => { if (labels[i] === ci && v !== null) out.push(v); });
+  return out;
+}
+
+function statsTable() {                                              // [{metric, all, clusters: [...]}]
+  return DATA.metrics.map((metric) => ({
+    metric: metric.name,
+    all: describe(metric.values),                                    // every subject
+    clusters: method().clusters.map((_, ci) => describe(clusterValues(metric, ci))),
+  }));
+}
+
+function fmt(v) {                                                    // compact number: 4 significant digits
+  if (!Number.isFinite(v)) return "–";
+  const a = Math.abs(v);
+  if (a !== 0 && (a >= 1e5 || a < 1e-3)) return v.toExponential(2);
+  return String(Number(v.toPrecision(4)));
+}
+
+function tint(z) {                                                   // blue = lower, red = higher than all
+  const t = Math.max(-1, Math.min(1, z / 1.5));                      // 1.5 SD = full colour
+  const alpha = (Math.abs(t) * 0.45).toFixed(3);
+  return t < 0 ? `rgba(38,132,246,${alpha})` : `rgba(240,60,60,${alpha})`;
+}
+
+function cell(tag, className, html) {                                // small DOM helper
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  el.innerHTML = html;
+  return el;
+}
+
+function esc(text) {                                                 // metric and cluster names are data
+  const d = document.createElement("div");
+  d.textContent = String(text);
+  return d.innerHTML;
+}
+
+function renderStats() {                                             // the matrix: metrics x clusters
+  const box = $("stats");
+  box.textContent = "";
+  const rows = statsTable();
+  const m = method();
+  box.appendChild(cell("p", "note",
+    `Per-cluster statistics for <b>${esc(m.name)}</b>. Each cell: mean, then SD and variance (σ², n−1), ` +
+    `then median, interquartile range and valid n. ` +
+    (state.statsTint ? `Tint = cluster mean vs all subjects, in SD units: <span class="chip" style="background:${tint(-1.5)}"></span>lower ` +
+                       `<span class="chip" style="background:${tint(1.5)}"></span>higher.` : "")));
+
+  const table = document.createElement("table");
+  const head = document.createElement("tr");
+  head.appendChild(cell("th", "metric", "Metric"));
+  m.clusters.forEach((c) => head.appendChild(cell("th", "", `<span class="dot" style="background:${c.color}"></span>${esc(c.name)}`)));
+  head.appendChild(cell("th", "all", `All (n=${DATA.subjects.length})`));
+  const thead = document.createElement("thead");
+  thead.appendChild(head);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell("td", "metric", esc(row.metric)));
+    const all = row.all;
+    [...row.clusters, all].forEach((s, k) => {
+      const isAll = k === row.clusters.length;                       // last column = every subject
+      const td = cell("td", isAll ? "all" : "",
+        `<span class="mean">${fmt(s.mean)}</span>` +
+        `<span class="sub">SD ${fmt(s.sd)} · σ² ${fmt(s.variance)}</span>` +
+        `<span class="sub">median ${fmt(s.median)} · IQR ${fmt(s.q1)}–${fmt(s.q3)}</span>` +
+        `<span class="sub">n ${s.n}</span>`);
+      if (!isAll && state.statsTint && all.sd > 0) td.style.background = tint((s.mean - all.mean) / all.sd);
+      td.title = `min ${fmt(s.min)}, max ${fmt(s.max)}`;             // extra detail on hover
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  const wrap = document.createElement("div");
+  wrap.className = "wrap";
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+}
+
+function statsCsv() {                                                // long format: one row per metric x group
+  const cols = ["method", "metric", "group", "n", "mean", "sd", "variance", "median", "q1", "q3", "min", "max"];
+  const quote = (x) => (/[",\n]/.test(String(x)) ? `"${String(x).replace(/"/g, '""')}"` : String(x));
+  const lines = [cols.join(",")];
+  statsTable().forEach((row) => {
+    const groups = [...row.clusters.map((s, ci) => [method().clusters[ci].name, s]), ["all", row.all]];
+    groups.forEach(([name, s]) => {
+      const values = [method().name, row.metric, name, s.n, s.mean, s.sd, s.variance, s.median, s.q1, s.q3, s.min, s.max];
+      lines.push(values.map((x) => quote(typeof x === "number" && !Number.isFinite(x) ? "" : x)).join(","));
+    });
+  });
+  return lines.join("\n");
+}
+
+// ---------- box plots ----------------------------------------------------------------
+function boxMetrics() {                                              // metrics shown in the grid
+  if (state.boxMetric === "all") return DATA.metrics;
+  const one = DATA.metrics.filter((m) => m.name === state.boxMetric);
+  return one.length ? one : DATA.metrics;
+}
+
+function boxFigure() {                                               // one subplot per metric, one box per cluster
+  const t = tokens();
+  const m = method();
+  const metrics = boxMetrics();
+  const width = plotEl.clientWidth || 1200;                          // stage size decides the grid
+  const height = plotEl.clientHeight || 700;
+  const cols = metrics.length === 1 ? 1 : width > 1100 ? 4 : width > 620 ? 2 : 1;
+  const rows = Math.ceil(metrics.length / cols);
+  const labelPx = 66;                                                // room for the 4-line tick labels
+  const titlePx = 26;                                                // room for each subplot title
+  const gapY = (labelPx + titlePx) / height;                         // vertical gap as a fraction
+  const gapX = cols > 1 ? 0.05 : 0;
+  const top = 1 - titlePx / height;
+  const cellH = (top - labelPx / height - gapY * (rows - 1)) / rows;
+  const cellW = (1 - gapX * (cols - 1)) / cols;
+
+  const data = [];
+  const layout = {
+    paper_bgcolor: t.plot, plot_bgcolor: t.plot, showlegend: false, uirevision: "box",
+    font: { family: t.font, color: t.text, size: 12 },
+    hoverlabel: { bgcolor: t.panel, bordercolor: t.line, font: { color: t.text, family: t.font } },
+    margin: { l: 56, r: 16, t: 10, b: 10 }, annotations: [], height: rows > 2 ? rows * 330 : undefined,
+  };
+  metrics.forEach((metric, k) => {
+    const r = Math.floor(k / cols);
+    const c = k % cols;
+    const suffix = k === 0 ? "" : String(k + 1);                     // x, x2, x3 ...
+    const x0 = c * (cellW + gapX);
+    const y1 = top - r * (cellH + gapY);
+    const ticks = [];
+    m.clusters.forEach((cluster, ci) => {
+      const idx = [];                                                // rows of this cluster with a value
+      metric.values.forEach((v, i) => { if (m.labels[i] === ci && v !== null) idx.push(i); });
+      const s = describe(idx.map((i) => metric.values[i]));
+      const short = cluster.name.replace(/\s*\(n=\d+\)$/, "");       // "cluster 0"
+      ticks.push(`${short}<br>n=${s.n}<br>μ=${fmt(s.mean)}<br>σ²=${fmt(s.variance)}`);   // 4 short lines
+      data.push({
+        type: "box", name: short, x0: ticks.length - 1, y: idx.map((i) => metric.values[i]),
+        xaxis: `x${suffix}`, yaxis: `y${suffix}`,
+        marker: { color: cluster.color, size: 3, opacity: 0.45 }, line: { color: cluster.color, width: 1.5 },
+        fillcolor: cluster.color + "33",                             // same colour, 20 % opaque
+        boxmean: "sd",                                               // dashed mean line + diamond of ±1 SD
+        boxpoints: state.boxPoints ? "all" : "outliers", jitter: 0.45, pointpos: 0,
+        text: idx.map((i) => DATA.subjects[i]),
+        hovertemplate: `<b>%{text}</b><br>${short}<br>${esc(metric.name)}=%{y:.4g}<extra></extra>`,
+      });
+    });
+    layout[`xaxis${suffix}`] = { domain: [x0, x0 + cellW], anchor: `y${suffix}`, tickmode: "array",
+      tickvals: m.clusters.map((_, ci) => ci), ticktext: ticks, tickfont: { size: 10, color: t.muted }, tickangle: 0,
+      color: t.muted, linecolor: t.line, showgrid: false, zeroline: false, fixedrange: true };
+    layout[`yaxis${suffix}`] = { domain: [Math.max(0, y1 - cellH), y1], anchor: `x${suffix}`,
+      color: t.muted, gridcolor: t.grid, zeroline: false, automargin: true };
+    layout.annotations.push({ text: `<b>${esc(metric.name)}</b>`, showarrow: false, xref: "paper", yref: "paper",
+      x: x0 + cellW / 2, y: y1, xanchor: "center", yanchor: "bottom", font: { size: 13, color: t.text } });
+  });
+  return { data, layout };
+}
+
+const CONFIG = { responsive: true, displaylogo: false, scrollZoom: true,
+                 modeBarButtonsToRemove: ["toImage", "sendDataToCloud", "lasso2d", "select2d"] };
+
+function draw() {                                                    // (re)render what is selected
+  if (!DATA.methods.length) return Promise.resolve();
+  $("stats").hidden = state.view !== "stats";                        // the table covers the plot area
+  if (state.view === "stats") {                                      // HTML table, no plotly figure
+    Plotly.purge(plotEl);
+    renderStats();
+    return Promise.resolve();
+  }
+  if (state.view === "boxplot") {                                    // box plot grid
+    const fig = boxFigure();
+    return Plotly.react(plotEl, fig.data, fig.layout, CONFIG);
+  }
+  return Plotly.react(plotEl, buildData(), buildLayout(), CONFIG);
+}
+
+function rememberCamera() {                                          // save rotation before switching
+  const scene = plotEl.layout && plotEl.layout.scene;                // plotly writes user moves here
+  if (scene && scene.camera && DATA.methods.length) {
+    state.cameras[cameraKey()] = JSON.parse(JSON.stringify(scene.camera));
+  }
+}
+
+// ---------- camera tools ------------------------------------------------------------
+function camera() {                                                  // live camera of the scene
+  const scene = plotEl.layout.scene || {};
+  return JSON.parse(JSON.stringify(scene.camera || { eye: DEFAULT_EYE, center: { x: 0, y: 0, z: 0 } }));
+}
+
+function setCamera(cam) {                                            // apply and remember a camera
+  cam.projection = { type: state.projectionType };                   // projection travels with the camera
+  state.cameras[cameraKey()] = cam;
+  return Plotly.relayout(plotEl, { "scene.camera": cam });
+}
+
+function preset(name, opposite) {                                    // Blender numpad style views
+  const cam = camera();                                              // keep the current zoom distance
+  const c = cam.center || { x: 0, y: 0, z: 0 };
+  const e = cam.eye;
+  const r = Math.hypot(e.x - c.x, e.y - c.y, e.z - c.z) || 2.165;    // eye distance
+  const s = opposite ? -1 : 1;                                       // Alt flips to the other side
+  const dirs = { front: [0, -s, 0], right: [s, 0, 0], top: [0, 0, s], iso: [0.577, 0.577, 0.577] };
+  const d = dirs[name];
+  const up = name === "top" ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
+  return setCamera({ eye: { x: c.x + r * d[0], y: c.y + r * d[1], z: c.z + r * d[2] }, center: c, up });
+}
+
+function orbit(dAzimuth, dElevation) {                               // rotate the eye around the centre
+  const cam = camera();
+  const c = cam.center || { x: 0, y: 0, z: 0 };
+  const v = { x: cam.eye.x - c.x, y: cam.eye.y - c.y, z: cam.eye.z - c.z };
+  const r = Math.hypot(v.x, v.y, v.z);                               // distance stays fixed
+  const az = Math.atan2(v.y, v.x) + dAzimuth;                        // horizontal angle
+  let el = Math.asin(v.z / r) + dElevation;                          // vertical angle
+  el = Math.max(-1.5, Math.min(1.5, el));                            // stop just short of the poles
+  cam.eye = { x: c.x + r * Math.cos(el) * Math.cos(az), y: c.y + r * Math.cos(el) * Math.sin(az),
+              z: c.z + r * Math.sin(el) };
+  cam.up = { x: 0, y: 0, z: 1 };                                     // turntable keeps z up
+  return setCamera(cam);
+}
+
+let spinFrame = null;                                                // requestAnimationFrame handle
+function setSpin(on) {
+  state.spinning = on && is3d();                                     // only meaningful in 3D
+  $("spin").setAttribute("aria-pressed", String(state.spinning));
+  cancelAnimationFrame(spinFrame);
+  if (!state.spinning) return;
+  let last = performance.now();                                      // frame-rate independent speed
+  const step = (now) => {
+    const dt = (now - last) / 1000;
+    last = now;
+    orbit(dt * 0.35, 0).then(() => { if (state.spinning) spinFrame = requestAnimationFrame(step); });
+  };
+  spinFrame = requestAnimationFrame(step);
+}
+
+function resetView() {
+  if (is3d()) {
+    delete state.cameras[cameraKey()];
+    return setCamera({ eye: DEFAULT_EYE, center: { x: 0, y: 0, z: 0 }, up: { x: 0, y: 0, z: 1 } });
+  }
+  return Plotly.relayout(plotEl, { "xaxis.autorange": true, "yaxis.autorange": true });
+}
+
+// ---------- tabs and selectors ------------------------------------------------------
+function renderMethods() {
+  const nav = $("methods");
+  nav.textContent = "";
+  DATA.methods.forEach((m, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", String(i === state.method));
+    btn.textContent = m.name;
+    btn.addEventListener("click", () => selectMethod(i));
+    nav.appendChild(btn);
+  });
+}
+
+function renderProjections() {
+  const nav = $("projections");
+  nav.textContent = "";
+  method().projections.forEach((p, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", String(onProjection() && i === state.projection));
+    btn.textContent = p.name;
+    btn.addEventListener("click", () => selectProjection(i));
+    nav.appendChild(btn);
+  });
+  const sep = document.createElement("span");                        // divider before the summary tabs
+  sep.className = "sep";
+  sep.setAttribute("aria-hidden", "true");
+  nav.appendChild(sep);
+  VIEWS.forEach((v) => {                                             // Stats, Box plots
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", String(state.view === v.key));
+    btn.textContent = v.name;
+    btn.addEventListener("click", () => selectView(v.key));
+    nav.appendChild(btn);
+  });
+}
+
+function renderBoxMetrics() {                                        // box plot metric menu
+  const select = $("box-metric");
+  select.textContent = "";
+  select.add(new Option("All metrics", "all", false, state.boxMetric === "all"));
+  DATA.metrics.forEach((m) => select.add(new Option(m.name, m.name, false, state.boxMetric === m.name)));
+}
+
+function renderColours() {
+  const select = $("colour");
+  select.textContent = "";
+  select.add(new Option("Clusters", "clusters", false, state.colour === "clusters"));
+  DATA.metrics.forEach((m) => select.add(new Option(m.name, m.name, false, state.colour === m.name)));
+}
+
+function renderSettings() {
+  const p = projection();                                            // its hyper-parameter, if any
+  const select = $("setting");
+  select.textContent = "";                                           // rebuild the options
+  p.settings.forEach((x, i) => select.add(new Option(x.label || "default", String(i), false, i === state.setting)));
+  $("setting-label").textContent = p.parameter || "Setting";         // e.g. "n_neighbors"
+  $("setting-field").hidden = !onProjection() || p.settings.length < 2;   // one setting: nothing to choose
+}
+
+function renderDims() {
+  const available = setting().dims;                                  // some settings may lack a mode
+  document.querySelectorAll("#dims button").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.dim === state.dim));
+    b.disabled = !available[b.dataset.dim];                          // grey out a missing mode
+  });
+  const proj = onProjection();                                       // scatter tools only on projections
+  document.querySelectorAll(".only3d").forEach((el) => { el.hidden = !proj || !is3d(); });
+  document.querySelectorAll(".only2d").forEach((el) => { el.hidden = !proj || is3d(); });
+  document.querySelectorAll(".projonly").forEach((el) => { el.hidden = !proj; });
+  document.querySelectorAll(".boxonly").forEach((el) => { el.hidden = state.view !== "boxplot"; });
+  document.querySelectorAll(".statsonly").forEach((el) => { el.hidden = state.view !== "stats"; });
+  if (proj) $("setting-field").hidden = projection().settings.length < 2;   // one setting: nothing to choose
+  const chosen = proj && projection().settings.length > 1            // name the setting in the header
+    ? `, ${projection().parameter || "setting"} = ${settingLabel() || "default"}` : "";
+  $("app-sub").textContent = `${DATA.subjects.length} subjects, ${method().clusters.length} clusters${chosen}`;
+}
+
+// ---------- actions -----------------------------------------------------------------
+function resolveSetting() {                                          // return to the chosen value
+  const list = projection().settings;
+  const found = list.findIndex((x) => x.label === state.keepLabel);   // same parameter value?
+  state.setting = found >= 0 ? found : 0;                             // otherwise the first one
+  if (!setting().dims[state.dim]) state.dim = setting().dims["3D"] ? "3D" : "2D";   // mode exists?
+}
+
+function selectMethod(i) {
+  if (onProjection()) rememberCamera();
+  const keep = projection().name;                                    // stay on the same projection
+  state.method = (i + DATA.methods.length) % DATA.methods.length;
+  const found = method().projections.findIndex((p) => p.name === keep);
+  state.projection = found >= 0 ? found : 0;
+  resolveSetting();
+  setSpin(false);
+  refresh();
+}
+
+function selectView(key) {                                          // Stats or Box plots tab
+  if (onProjection()) rememberCamera();                              // keep the 3D angle for later
+  state.view = key;
+  setSpin(false);
+  refresh();
+}
+
+function stepTab(delta) {                                            // PgUp / PgDn across every tab
+  const tabs = [...method().projections.map((_, i) => ["projection", i]), ...VIEWS.map((v) => [v.key, -1])];
+  const now = tabs.findIndex(([view, i]) => view === state.view && (i < 0 || i === state.projection));
+  const [view, i] = tabs[(now + delta + tabs.length) % tabs.length];
+  if (view === "projection") selectProjection(i);
+  else selectView(view);
+}
+
+function selectProjection(i) {
+  if (onProjection()) rememberCamera();
+  state.view = "projection";                                         // back from Stats / Box plots
+  const list = method().projections;
+  state.projection = (i + list.length) % list.length;
+  resolveSetting();                                                  // keep the parameter value if it exists
+  setSpin(false);
+  refresh();
+}
+
+function selectSetting(i) {                                          // another hyper-parameter value
+  const list = projection().settings;
+  if (!onProjection() || list.length < 2) return;                    // nothing to step through
+  rememberCamera();                                                  // the embedding changes, the angle stays
+  state.setting = (i + list.length) % list.length;
+  state.keepLabel = settingLabel();                                  // remembered across tabs
+  if (!setting().dims[state.dim]) state.dim = setting().dims["3D"] ? "3D" : "2D";
+  setSpin(false);
+  refresh();
+}
+
+function selectDim(dim) {
+  if (!onProjection() || dim === state.dim || !setting().dims[dim]) return;
+  rememberCamera();                                                  // keep the 3D camera for later
+  state.dim = dim;
+  setSpin(false);
+  refresh();
+}
+
+function selectColour(value) {
+  state.colour = value;                                              // same coordinates, other colours
+  draw();
+}
+
+function refresh() {                                                 // redraw tabs, selectors and plot
+  renderMethods();
+  renderProjections();
+  renderSettings();
+  renderDims();
+  return draw();
+}
+
+let toastTimer = null;
+function toast(message) {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+let downloads = null;                                                // claude.ai save capability
+const hosted = !!(window.claude && typeof window.claude.use === "function");
+if (hosted) window.claude.use("downloads").then((api) => { downloads = api; }).catch(() => { downloads = null; });
+
+async function saveFile(filename, blob) {
+  if (!hosted) {                                                     // plain browser: normal download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return;
+  }
+  if (!downloads) { toast("Saving files is not available in this view."); return; }
+  try {
+    await downloads.save({ filename, data: blob });
+    toast(`Saved ${filename}`);
+  } catch (err) {
+    toast(err && err.code === "declined" ? "Save cancelled." : `Could not save: ${(err && err.message) || "unknown error"}`);
+  }
+}
+
+// ---------- wiring ------------------------------------------------------------------
+function wire() {
+  document.querySelectorAll("#dims button").forEach((b) => b.addEventListener("click", () => selectDim(b.dataset.dim)));
+  $("colour").addEventListener("change", (e) => selectColour(e.target.value));
+  $("box-metric").addEventListener("change", (e) => { state.boxMetric = e.target.value; draw(); });
+  $("box-points").addEventListener("change", (e) => { state.boxPoints = e.target.checked; draw(); });
+  $("stats-tint").addEventListener("change", (e) => { state.statsTint = e.target.checked; draw(); });
+  $("stats-csv").addEventListener("click", () => {
+    const name = `cluster_stats_${method().name.replace(/\W+/g, "_").toLowerCase()}.csv`;
+    saveFile(name, new Blob([statsCsv()], { type: "text/csv" }));
+  });
+  let resizeTimer = null;                                            // box grid depends on the stage size
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (state.view === "boxplot") draw(); }, 200);
+  });
+  $("setting").addEventListener("change", (e) => selectSetting(Number(e.target.value)));
+  document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => preset(b.dataset.preset, false)));
+  document.querySelectorAll("#drag2d button").forEach((b) => b.addEventListener("click", () => {
+    state.drag2d = b.dataset.drag;
+    document.querySelectorAll("#drag2d button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    Plotly.relayout(plotEl, { dragmode: state.drag2d });
+  }));
+  $("dragmode3d").addEventListener("change", (e) => {
+    state.dragmode3d = e.target.value;
+    Plotly.relayout(plotEl, { "scene.dragmode": state.dragmode3d });
+  });
+  $("equal").addEventListener("change", (e) => { state.equal = e.target.checked; rememberCamera(); draw(); });
+  $("box").addEventListener("change", (e) => { state.box = e.target.checked; rememberCamera(); draw(); });
+  $("size").addEventListener("input", (e) => { state.size = Number(e.target.value); draw(); });
+  $("spin").addEventListener("click", () => setSpin(!state.spinning));
+  $("reset").addEventListener("click", resetView);
+  $("offline").addEventListener("click", () => saveFile("latent_explorer.html", new Blob([PAGE_SOURCE], { type: "text/html" })));
+  $("help-btn").addEventListener("click", () => {
+    const help = $("help");
+    help.hidden = !help.hidden;
+    $("help-btn").setAttribute("aria-expanded", String(!help.hidden));
+  });
+
+  plotEl.addEventListener("pointerdown", () => { if (state.spinning) setSpin(false); });  // user takes over
+  document.addEventListener("keydown", onKey);
+  const themeChanged = () => { rememberCamera(); draw(); };          // recolour the plot
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", themeChanged);
+  new MutationObserver(themeChanged).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+}
+
+function onKey(e) {
+  if (e.target.closest("input, select, textarea")) return;           // typing in a field
+  if (e.ctrlKey || e.metaKey) return;                                // leave browser shortcuts alone
+  const code = e.code;                                               // physical key, works on AZERTY too
+  const digit = code.replace(/^(Digit|Numpad)/, "");                 // "Numpad7" -> "7"
+  const step = Math.PI / 12;                                         // 15 degrees
+  const three = DATA.methods.length && onProjection() && is3d();
+  const actions = {
+    "1": () => three && preset("front", e.altKey), "3": () => three && preset("right", e.altKey),
+    "7": () => three && preset("top", e.altKey),
+    "4": () => three && orbit(-step, 0), "6": () => three && orbit(step, 0),
+    "8": () => three && orbit(0, step), "2": () => three && orbit(0, -step),
+  };
+  let handled = true;                                                // assume we use the key
+  if (/^(Digit|Numpad)\d$/.test(code) && actions[digit]) actions[digit]();
+  else if (code === "KeyD") selectDim(is3d() ? "2D" : "3D");
+  else if (code === "ArrowLeft") selectSetting(state.setting - 1);   // sweep the hyper-parameter
+  else if (code === "ArrowRight") selectSetting(state.setting + 1);
+  else if (code === "KeyR") setSpin(!state.spinning);
+  else if (code === "KeyF") { document.body.classList.toggle("focus"); setTimeout(() => Plotly.Plots.resize(plotEl), 50); }
+  else if (code === "Home") { if (onProjection()) resetView(); }
+  else if (code === "PageDown") stepTab(1);
+  else if (code === "PageUp") stepTab(-1);
+  else if (code === "Escape") { $("help").hidden = true; setSpin(false); }
+  else handled = false;
+  if (handled) e.preventDefault();                                   // stop page scroll on PgUp etc.
+}
+
+function start() {
+  wire();
+  if (!DATA.methods.length) { $("nodata").hidden = false; $("tools").hidden = true; return; }
+  $("app-title").firstChild.textContent = DATA.title || "Latent space explorer";
+  document.title = DATA.title || document.title;
+  if (!setting().dims[state.dim]) state.dim = "2D";                  // 3D missing: start in 2D
+  renderColours();
+  renderBoxMetrics();
+  refresh();
+}
+
+if (typeof Plotly === "undefined") {                                 // plotly.js failed to load
+  $("nodata").hidden = false;
+  $("nodata").textContent = "Plotly.js is missing from this file. Rebuild it with build_explorer.py.";
+} else {
+  start();
+}
+</script>
+</body>
+</html>
